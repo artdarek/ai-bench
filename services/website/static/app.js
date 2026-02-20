@@ -1,9 +1,8 @@
 const STORAGE_KEY = 'aibench_history_v1';
 const MAX_HISTORY = 300;
 const DEFAULT_SYSTEM_PROMPT =
-  'You are a precise benchmark assistant. Provide a concise answer first, then a short bullet summary with key points.';
-const DEFAULT_MESSAGE =
-  'Explain the difference between retrieval-augmented generation (RAG) and fine-tuning for a support chatbot. Include pros, cons, and when to use each.';
+  'You are a friendly and polite assistant. Be warm, helpful, and concise in your responses.';
+const DEFAULT_MESSAGE = 'How are you?';
 
 const state = {
   config: null,
@@ -18,6 +17,8 @@ const el = {
   modelWrap: document.getElementById('modelWrap'),
   deploymentWrap: document.getElementById('deploymentWrap'),
   systemPrompt: document.getElementById('systemPrompt'),
+  includeConversationHistory: document.getElementById('includeConversationHistory'),
+  historyMessageLimit: document.getElementById('historyMessageLimit'),
   message: document.getElementById('message'),
   keepMessageAfterSend: document.getElementById('keepMessageAfterSend'),
   sendBtn: document.getElementById('sendBtn'),
@@ -32,6 +33,9 @@ const el = {
   totalTokens: document.getElementById('totalTokens'),
   totalCost: document.getElementById('totalCost'),
   responseTimeMs: document.getElementById('responseTimeMs'),
+  systemContextChars: document.getElementById('systemContextChars'),
+  messageChars: document.getElementById('messageChars'),
+  outputChars: document.getElementById('outputChars'),
   history: document.getElementById('history'),
   historyDetailsModal: document.getElementById('historyDetailsModal'),
   historyDetailsCloseBtn: document.getElementById('historyDetailsCloseBtn'),
@@ -43,6 +47,10 @@ const el = {
   historyDetailsModel: document.getElementById('historyDetailsModel'),
   historyDetailsDeployment: document.getElementById('historyDetailsDeployment'),
   historyDetailsResponseTime: document.getElementById('historyDetailsResponseTime'),
+  historyDetailsContextMessages: document.getElementById('historyDetailsContextMessages'),
+  historyDetailsSystemContextChars: document.getElementById('historyDetailsSystemContextChars'),
+  historyDetailsMessageChars: document.getElementById('historyDetailsMessageChars'),
+  historyDetailsOutputChars: document.getElementById('historyDetailsOutputChars'),
   historyDetailsInputTokens: document.getElementById('historyDetailsInputTokens'),
   historyDetailsOutputTokens: document.getElementById('historyDetailsOutputTokens'),
   historyDetailsTotalTokens: document.getElementById('historyDetailsTotalTokens'),
@@ -74,6 +82,7 @@ async function init() {
 
   el.provider.addEventListener('change', onProviderChange);
   el.message.addEventListener('input', resizeMessageInput);
+  el.includeConversationHistory.addEventListener('change', onHistoryToggleChange);
   el.history.addEventListener('click', onHistoryClick);
   el.historyDetailsModal.addEventListener('click', onModalClick);
   el.historyDetailsCloseBtn.addEventListener('click', closeHistoryDetailsModal);
@@ -86,6 +95,7 @@ async function init() {
   el.sendBtn.addEventListener('click', onSend);
   el.exportBtn.addEventListener('click', exportCsv);
   el.clearBtn.addEventListener('click', clearHistory);
+  onHistoryToggleChange();
   resizeMessageInput();
 }
 
@@ -137,6 +147,11 @@ function onProviderChange() {
   resizeMessageInput();
 }
 
+function onHistoryToggleChange() {
+  const enabled = Boolean(el.includeConversationHistory?.checked);
+  el.historyMessageLimit.disabled = !enabled;
+}
+
 async function onSend() {
   const message = el.message.value.trim();
   if (!message) {
@@ -145,10 +160,14 @@ async function onSend() {
   }
 
   const provider = el.provider.value;
+  const historyContext = buildHistoryContext();
+  const systemContextChars = countChars(el.systemPrompt.value) + historyContext.messages.reduce((sum, msg) => sum + countChars(msg.content), 0);
+  const messageChars = countChars(message);
   const body = {
     provider,
     system_prompt: el.systemPrompt.value,
     message,
+    history_messages: historyContext.messages,
   };
 
   if (provider === 'openai') {
@@ -173,6 +192,7 @@ async function onSend() {
     if (!response.ok) {
       throw new Error(payload?.detail || 'API request failed.');
     }
+    const outputChars = countChars(payload.answer || '');
 
     el.answer.textContent = payload.answer || '';
     el.inputTokens.textContent = String(payload.usage?.input_tokens ?? 0);
@@ -182,6 +202,9 @@ async function onSend() {
     el.totalTokens.textContent = String(payload.usage?.total_tokens ?? 0);
     el.totalCost.textContent = `$${formatUsd(payload.cost?.total_cost_usd ?? 0)}`;
     el.responseTimeMs.textContent = formatResponseTimeMs(responseTimeMs);
+    el.systemContextChars.textContent = String(systemContextChars);
+    el.messageChars.textContent = String(messageChars);
+    el.outputChars.textContent = String(outputChars);
 
     const historyEntry = {
       id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -195,6 +218,10 @@ async function onSend() {
       usage: payload.usage || {},
       cost: payload.cost || {},
       responseTimeMs,
+      contextMessagesCount: historyContext.contextMessagesCount,
+      systemContextChars,
+      messageChars,
+      outputChars,
     };
 
     state.history = [...state.history, historyEntry].slice(-MAX_HISTORY);
@@ -245,6 +272,8 @@ function renderHistory() {
         <div><strong>System:</strong> ${escapeHtml(shorten(item.systemPrompt, 220))}</div>
         <div><strong>Message:</strong> ${escapeHtml(shorten(item.message, 220))}</div>
         <div><strong>Answer:</strong> ${escapeHtml(shorten(item.answer, 220))}</div>
+        <div class="meta mt-1">Context messages: ${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</div>
+        <div class="meta">Chars: system+context=${item.systemContextChars ?? countChars(item.systemPrompt || '')}, message=${item.messageChars ?? countChars(item.message || '')}, output=${item.outputChars ?? countChars(item.answer || '')}</div>
         <div class="usage-grid usage-grid-compact history-usage-grid mt-2">
           <article class="usage-card">
             <h4 class="usage-card-title">Input</h4>
@@ -281,6 +310,30 @@ function loadHistory() {
   } catch {
     return [];
   }
+}
+
+function buildHistoryContext() {
+  if (!el.includeConversationHistory?.checked) {
+    return { messages: [], contextMessagesCount: 0 };
+  }
+
+  const requestedCount = Number.parseInt(el.historyMessageLimit?.value || '0', 10);
+  const pairCount = Number.isFinite(requestedCount) ? Math.max(1, Math.min(100, requestedCount)) : 1;
+  const latestPairs = state.history.slice(-pairCount);
+  const messages = [];
+
+  for (const entry of latestPairs) {
+    const userText = String(entry.message || '').trim();
+    const assistantText = String(entry.answer || '').trim();
+    if (userText) {
+      messages.push({ role: 'user', content: userText });
+    }
+    if (assistantText) {
+      messages.push({ role: 'assistant', content: assistantText });
+    }
+  }
+
+  return { messages, contextMessagesCount: latestPairs.length };
 }
 
 function persistHistory() {
@@ -359,6 +412,10 @@ function exportCsv() {
     'outputCostUsd',
     'totalCostUsd',
     'responseTimeMs',
+    'contextMessagesCount',
+    'systemContextChars',
+    'messageChars',
+    'outputChars',
     'systemPrompt',
     'message',
     'answer',
@@ -377,6 +434,10 @@ function exportCsv() {
     item.cost?.output_cost_usd ?? '',
     item.cost?.total_cost_usd ?? '',
     item.responseTimeMs ?? '',
+    item.contextMessagesCount ?? item.contextPairsCount ?? '',
+    item.systemContextChars ?? '',
+    item.messageChars ?? '',
+    item.outputChars ?? '',
     item.systemPrompt,
     item.message,
     item.answer,
@@ -427,6 +488,10 @@ function formatResponseTimeMs(value) {
   const seconds = Math.floor(rounded / 1000);
   const msRemainder = rounded % 1000;
   return `${seconds}s ${msRemainder}ms`;
+}
+
+function countChars(value) {
+  return String(value || '').length;
 }
 
 function formatHistoryDate(value) {
@@ -510,6 +575,10 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsModel.textContent = entry.model || '-';
   el.historyDetailsDeployment.textContent = entry.deployment || '-';
   el.historyDetailsResponseTime.textContent = formatResponseTimeMs(entry.responseTimeMs);
+  el.historyDetailsContextMessages.textContent = String(entry.contextMessagesCount ?? entry.contextPairsCount ?? 0);
+  el.historyDetailsSystemContextChars.textContent = String(entry.systemContextChars ?? countChars(entry.systemPrompt || ''));
+  el.historyDetailsMessageChars.textContent = String(entry.messageChars ?? countChars(entry.message || ''));
+  el.historyDetailsOutputChars.textContent = String(entry.outputChars ?? countChars(entry.answer || ''));
   el.historyDetailsInputTokens.textContent = String(entry.usage?.input_tokens ?? 0);
   el.historyDetailsOutputTokens.textContent = String(entry.usage?.output_tokens ?? 0);
   el.historyDetailsTotalTokens.textContent = String(entry.usage?.total_tokens ?? 0);

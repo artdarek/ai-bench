@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
     deployment: str | None = None
     system_prompt: str = Field(default='')
     message: str = Field(min_length=1)
+    history_messages: list[dict[str, str]] = Field(default_factory=list)
 
 
 class UsageDto(BaseModel):
@@ -84,6 +85,22 @@ def normalize_text_content(content: Any) -> str:
     return ''
 
 
+def normalize_history_messages(items: list[dict[str, str]] | None) -> list[dict[str, str]]:
+    if not items:
+        return []
+
+    normalized: list[dict[str, str]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get('role', '')).strip().lower()
+        content = str(item.get('content', '')).strip()
+        if role not in {'user', 'assistant'} or not content:
+            continue
+        normalized.append({'role': role, 'content': content})
+    return normalized
+
+
 def normalize_azure_endpoint(raw_endpoint: str) -> str:
     endpoint = (raw_endpoint or '').strip()
     if not endpoint:
@@ -116,6 +133,7 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
     messages: list[dict[str, str]] = []
     if system_prompt:
         messages.append({'role': 'system', 'content': system_prompt})
+    messages.extend(normalize_history_messages(payload.history_messages))
     messages.append({'role': 'user', 'content': user_message})
 
     try:
