@@ -262,6 +262,11 @@
   color: #ecffef;
 }
 
+.response-time-badge {
+  background: #3b66ff;
+  color: #e9efff;
+}
+
 @media (max-width: 576px) {
   .usage-card .badge {
     font-size: 0.78rem;

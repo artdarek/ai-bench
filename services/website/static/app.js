@@ -1,5 +1,9 @@
 const STORAGE_KEY = 'aibench_history_v1';
 const MAX_HISTORY = 300;
+const DEFAULT_SYSTEM_PROMPT =
+  'You are a precise benchmark assistant. Provide a concise answer first, then a short bullet summary with key points.';
+const DEFAULT_MESSAGE =
+  'Explain the difference between retrieval-augmented generation (RAG) and fine-tuning for a support chatbot. Include pros, cons, and when to use each.';
 
 const state = {
   config: null,
@@ -27,6 +31,7 @@ const el = {
   outputCost: document.getElementById('outputCost'),
   totalTokens: document.getElementById('totalTokens'),
   totalCost: document.getElementById('totalCost'),
+  responseTimeMs: document.getElementById('responseTimeMs'),
   history: document.getElementById('history'),
   historyDetailsModal: document.getElementById('historyDetailsModal'),
   historyDetailsCloseBtn: document.getElementById('historyDetailsCloseBtn'),
@@ -37,6 +42,7 @@ const el = {
   historyDetailsProvider: document.getElementById('historyDetailsProvider'),
   historyDetailsModel: document.getElementById('historyDetailsModel'),
   historyDetailsDeployment: document.getElementById('historyDetailsDeployment'),
+  historyDetailsResponseTime: document.getElementById('historyDetailsResponseTime'),
   historyDetailsInputTokens: document.getElementById('historyDetailsInputTokens'),
   historyDetailsOutputTokens: document.getElementById('historyDetailsOutputTokens'),
   historyDetailsTotalTokens: document.getElementById('historyDetailsTotalTokens'),
@@ -63,6 +69,7 @@ async function init() {
 
   state.config = payload;
   setupProviderOptions();
+  applyDefaultPrompts();
   renderHistory();
 
   el.provider.addEventListener('change', onProviderChange);
@@ -89,6 +96,15 @@ function setupProviderOptions() {
     .join('');
 
   onProviderChange();
+}
+
+function applyDefaultPrompts() {
+  if (!el.systemPrompt.value.trim()) {
+    el.systemPrompt.value = DEFAULT_SYSTEM_PROMPT;
+  }
+  if (!el.message.value.trim()) {
+    el.message.value = DEFAULT_MESSAGE;
+  }
 }
 
 function onProviderChange() {
@@ -145,6 +161,7 @@ async function onSend() {
   setStatus('Sending request...');
 
   try {
+    const startedAt = performance.now();
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -152,6 +169,7 @@ async function onSend() {
     });
 
     const payload = await readApiResponse(response);
+    const responseTimeMs = Math.max(0, Math.round(performance.now() - startedAt));
     if (!response.ok) {
       throw new Error(payload?.detail || 'API request failed.');
     }
@@ -163,6 +181,7 @@ async function onSend() {
     el.outputCost.textContent = `$${formatUsd(payload.cost?.output_cost_usd ?? 0)}`;
     el.totalTokens.textContent = String(payload.usage?.total_tokens ?? 0);
     el.totalCost.textContent = `$${formatUsd(payload.cost?.total_cost_usd ?? 0)}`;
+    el.responseTimeMs.textContent = formatResponseTimeMs(responseTimeMs);
 
     const historyEntry = {
       id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -175,6 +194,7 @@ async function onSend() {
       answer: payload.answer || '',
       usage: payload.usage || {},
       cost: payload.cost || {},
+      responseTimeMs,
     };
 
     state.history = [...state.history, historyEntry].slice(-MAX_HISTORY);
@@ -245,6 +265,7 @@ function renderHistory() {
             <div class="d-flex flex-wrap gap-2">
               <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage?.total_tokens ?? 0}</strong></span>
               <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.total_cost_usd ?? 0)}</strong></span>
+              <span class="badge response-time-badge">Time: <strong class="ms-1">${formatResponseTimeMs(item.responseTimeMs)}</strong></span>
             </div>
           </article>
         </div>
@@ -337,6 +358,7 @@ function exportCsv() {
     'inputCostUsd',
     'outputCostUsd',
     'totalCostUsd',
+    'responseTimeMs',
     'systemPrompt',
     'message',
     'answer',
@@ -354,6 +376,7 @@ function exportCsv() {
     item.cost?.input_cost_usd ?? '',
     item.cost?.output_cost_usd ?? '',
     item.cost?.total_cost_usd ?? '',
+    item.responseTimeMs ?? '',
     item.systemPrompt,
     item.message,
     item.answer,
@@ -388,6 +411,22 @@ function setStatus(text, isError = false) {
 
 function formatUsd(value) {
   return Number(value || 0).toFixed(8);
+}
+
+function formatResponseTimeMs(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return '0 ms';
+  }
+
+  const rounded = Math.round(numeric);
+  if (rounded < 1000) {
+    return `${rounded} ms`;
+  }
+
+  const seconds = Math.floor(rounded / 1000);
+  const msRemainder = rounded % 1000;
+  return `${seconds}s ${msRemainder}ms`;
 }
 
 function formatHistoryDate(value) {
@@ -470,6 +509,7 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsProvider.textContent = entry.provider || '-';
   el.historyDetailsModel.textContent = entry.model || '-';
   el.historyDetailsDeployment.textContent = entry.deployment || '-';
+  el.historyDetailsResponseTime.textContent = formatResponseTimeMs(entry.responseTimeMs);
   el.historyDetailsInputTokens.textContent = String(entry.usage?.input_tokens ?? 0);
   el.historyDetailsOutputTokens.textContent = String(entry.usage?.output_tokens ?? 0);
   el.historyDetailsTotalTokens.textContent = String(entry.usage?.total_tokens ?? 0);
