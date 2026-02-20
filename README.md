@@ -1,0 +1,49 @@
+# AI Bench
+
+Prosty projekt do testowania promptow i porownywania kosztow dla `Chat Completions`.
+
+Aktualnie:
+- provider: OpenAI i Azure OpenAI,
+- model/deployment: skonfigurowane pod rodzine `gpt-5-mini`,
+- wejscie: `System Prompt` + `Message`,
+- wynik: odpowiedz + usage tokenow + koszt,
+- historia prob w `localStorage` + eksport CSV.
+
+## 1. Setup
+
+```bash
+make setup
+```
+
+Ustaw klucze w `.env`:
+- `OPENAI_API_KEY` dla OpenAI,
+- `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_API_VERSION` dla Azure.
+
+## 2. Konfiguracja modeli i deploymentow
+
+Plik: `config/providers.json`
+
+- `providers.openai.models` - lista modeli,
+- `providers.azure.deployments` - lista deploymentow (z mapowaniem na model),
+- `pricing` - ceny za 1M tokenow (input/output), uzywane do estymacji kosztu.
+
+## 3. Run local
+
+```bash
+make run
+```
+
+Aplikacja: `http://127.0.0.1:8000`
+
+## 4. Run docker
+
+```bash
+make docker-up
+```
+
+Aplikacja: `http://127.0.0.1:40239`
+
+## Uwagi
+
+- Koszt jest estymowany na podstawie `usage` z API i cennika w `config/providers.json`.
+- Przy Azure request idzie na `deployment` (nie na `model`).

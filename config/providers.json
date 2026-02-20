@@ -1,0 +1,35 @@
+{
+  "providers": {
+    "openai": {
+      "label": "OpenAI",
+      "models": [
+        {
+          "id": "gpt-5-mini",
+          "label": "gpt-5-mini"
+        }
+      ],
+      "pricing": {
+        "gpt-5-mini": {
+          "input_per_1m_tokens_usd": 0.25,
+          "output_per_1m_tokens_usd": 2.0
+        }
+      }
+    },
+    "azure": {
+      "label": "Azure OpenAI",
+      "deployments": [
+        {
+          "name": "gpt-5-mini",
+          "model": "gpt-5-mini",
+          "label": "gpt5-mini (gpt-5-mini)"
+        }
+      ],
+      "pricing": {
+        "gpt-5-mini": {
+          "input_per_1m_tokens_usd": 0.25,
+          "output_per_1m_tokens_usd": 2.0
+        }
+      }
+    }
+  }
+}
