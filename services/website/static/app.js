@@ -277,7 +277,7 @@ function renderHistory() {
         <div><strong>System:</strong> ${escapeHtml(shorten(item.systemPrompt, 220))}</div>
         <div><strong>Message:</strong> ${escapeHtml(shorten(item.message, 220))}</div>
         <div><strong>Answer:</strong> ${escapeHtml(shorten(item.answer, 220))}</div>
-        <div class="meta mt-1">Context messages: ${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</div>
+        <div class="meta mt-1">Messages included into context: ${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</div>
         <div class="history-chars-row usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
           <h4 class="usage-card-title mb-0">Characters</h4>
           <div class="usage-inline-badges d-flex align-items-center gap-2">
@@ -285,6 +285,12 @@ function renderHistory() {
             <span class="badge response-cost-badge">Context: <strong class="ms-1">${getContextChars(item)}</strong></span>
             <span class="badge response-cost-badge">Message: <strong class="ms-1">${item.messageChars ?? countChars(item.message || '')}</strong></span>
             <span class="badge response-time-badge">Output: <strong class="ms-1">${item.outputChars ?? countChars(item.answer || '')}</strong></span>
+          </div>
+        </div>
+        <div class="usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
+          <h4 class="usage-card-title mb-0">Time</h4>
+          <div class="usage-inline-badges d-flex align-items-center gap-2">
+            <span class="badge response-time-badge">Response: <strong class="ms-1">${formatResponseTimeMs(item.responseTimeMs)}</strong></span>
           </div>
         </div>
         <div class="usage-grid usage-grid-compact history-usage-grid mt-2">
@@ -307,7 +313,6 @@ function renderHistory() {
             <div class="d-flex flex-wrap gap-2">
               <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage?.total_tokens ?? 0}</strong></span>
               <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.total_cost_usd ?? 0)}</strong></span>
-              <span class="badge response-time-badge">Time: <strong class="ms-1">${formatResponseTimeMs(item.responseTimeMs)}</strong></span>
             </div>
           </article>
         </div>
