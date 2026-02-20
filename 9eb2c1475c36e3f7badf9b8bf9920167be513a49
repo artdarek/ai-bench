@@ -1,0 +1,25 @@
+services/website/static/app.js
+  a9178bf8e7e12a64 280,290-295
+config/.env.example
+  a9178bf8e7e12a64 1,3-4,6-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "9eb2c1475c36e3f7badf9b8bf9920167be513a49",
+  "prompts": {
+    "a9178bf8e7e12a64": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019c7aef-eaae-7270-bbd2-8e58218cd7c6",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 4,
+      "accepted_lines": 20,
+      "overriden_lines": 0
+    }
+  }
+}
