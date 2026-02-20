@@ -33,7 +33,8 @@ const el = {
   totalTokens: document.getElementById('totalTokens'),
   totalCost: document.getElementById('totalCost'),
   responseTimeMs: document.getElementById('responseTimeMs'),
-  systemContextChars: document.getElementById('systemContextChars'),
+  systemPromptChars: document.getElementById('systemPromptChars'),
+  contextChars: document.getElementById('contextChars'),
   messageChars: document.getElementById('messageChars'),
   outputChars: document.getElementById('outputChars'),
   history: document.getElementById('history'),
@@ -48,7 +49,8 @@ const el = {
   historyDetailsDeployment: document.getElementById('historyDetailsDeployment'),
   historyDetailsResponseTime: document.getElementById('historyDetailsResponseTime'),
   historyDetailsContextMessages: document.getElementById('historyDetailsContextMessages'),
-  historyDetailsSystemContextChars: document.getElementById('historyDetailsSystemContextChars'),
+  historyDetailsSystemPromptChars: document.getElementById('historyDetailsSystemPromptChars'),
+  historyDetailsContextChars: document.getElementById('historyDetailsContextChars'),
   historyDetailsMessageChars: document.getElementById('historyDetailsMessageChars'),
   historyDetailsOutputChars: document.getElementById('historyDetailsOutputChars'),
   historyDetailsInputTokens: document.getElementById('historyDetailsInputTokens'),
@@ -161,7 +163,8 @@ async function onSend() {
 
   const provider = el.provider.value;
   const historyContext = buildHistoryContext();
-  const systemContextChars = countChars(el.systemPrompt.value) + historyContext.messages.reduce((sum, msg) => sum + countChars(msg.content), 0);
+  const systemPromptChars = countChars(el.systemPrompt.value);
+  const contextChars = historyContext.messages.reduce((sum, msg) => sum + countChars(msg.content), 0);
   const messageChars = countChars(message);
   const body = {
     provider,
@@ -202,7 +205,8 @@ async function onSend() {
     el.totalTokens.textContent = String(payload.usage?.total_tokens ?? 0);
     el.totalCost.textContent = `$${formatUsd(payload.cost?.total_cost_usd ?? 0)}`;
     el.responseTimeMs.textContent = formatResponseTimeMs(responseTimeMs);
-    el.systemContextChars.textContent = String(systemContextChars);
+    el.systemPromptChars.textContent = String(systemPromptChars);
+    el.contextChars.textContent = String(contextChars);
     el.messageChars.textContent = String(messageChars);
     el.outputChars.textContent = String(outputChars);
 
@@ -219,7 +223,8 @@ async function onSend() {
       cost: payload.cost || {},
       responseTimeMs,
       contextMessagesCount: historyContext.contextMessagesCount,
-      systemContextChars,
+      systemPromptChars,
+      contextChars,
       messageChars,
       outputChars,
     };
@@ -273,7 +278,15 @@ function renderHistory() {
         <div><strong>Message:</strong> ${escapeHtml(shorten(item.message, 220))}</div>
         <div><strong>Answer:</strong> ${escapeHtml(shorten(item.answer, 220))}</div>
         <div class="meta mt-1">Context messages: ${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</div>
-        <div class="meta">Chars: system+context=${item.systemContextChars ?? countChars(item.systemPrompt || '')}, message=${item.messageChars ?? countChars(item.message || '')}, output=${item.outputChars ?? countChars(item.answer || '')}</div>
+        <div class="history-chars-row usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
+          <h4 class="usage-card-title mb-0">Characters</h4>
+          <div class="usage-inline-badges d-flex align-items-center gap-2">
+            <span class="badge response-token-badge">System: <strong class="ms-1">${getSystemPromptChars(item)}</strong></span>
+            <span class="badge response-cost-badge">Context: <strong class="ms-1">${getContextChars(item)}</strong></span>
+            <span class="badge response-cost-badge">Message: <strong class="ms-1">${item.messageChars ?? countChars(item.message || '')}</strong></span>
+            <span class="badge response-time-badge">Output: <strong class="ms-1">${item.outputChars ?? countChars(item.answer || '')}</strong></span>
+          </div>
+        </div>
         <div class="usage-grid usage-grid-compact history-usage-grid mt-2">
           <article class="usage-card">
             <h4 class="usage-card-title">Input</h4>
@@ -413,7 +426,8 @@ function exportCsv() {
     'totalCostUsd',
     'responseTimeMs',
     'contextMessagesCount',
-    'systemContextChars',
+    'systemPromptChars',
+    'contextChars',
     'messageChars',
     'outputChars',
     'systemPrompt',
@@ -435,7 +449,8 @@ function exportCsv() {
     item.cost?.total_cost_usd ?? '',
     item.responseTimeMs ?? '',
     item.contextMessagesCount ?? item.contextPairsCount ?? '',
-    item.systemContextChars ?? '',
+    item.systemPromptChars ?? countChars(item.systemPrompt || ''),
+    getContextChars(item),
     item.messageChars ?? '',
     item.outputChars ?? '',
     item.systemPrompt,
@@ -492,6 +507,25 @@ function formatResponseTimeMs(value) {
 
 function countChars(value) {
   return String(value || '').length;
+}
+
+function getSystemPromptChars(entry) {
+  if (typeof entry?.systemPromptChars === 'number') {
+    return entry.systemPromptChars;
+  }
+  return countChars(entry?.systemPrompt || '');
+}
+
+function getContextChars(entry) {
+  if (typeof entry?.contextChars === 'number') {
+    return entry.contextChars;
+  }
+
+  // Backward compatibility: older entries had a combined system+context value.
+  if (typeof entry?.systemContextChars === 'number') {
+    return Math.max(0, entry.systemContextChars - countChars(entry?.systemPrompt || ''));
+  }
+  return 0;
 }
 
 function formatHistoryDate(value) {
@@ -576,7 +610,8 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsDeployment.textContent = entry.deployment || '-';
   el.historyDetailsResponseTime.textContent = formatResponseTimeMs(entry.responseTimeMs);
   el.historyDetailsContextMessages.textContent = String(entry.contextMessagesCount ?? entry.contextPairsCount ?? 0);
-  el.historyDetailsSystemContextChars.textContent = String(entry.systemContextChars ?? countChars(entry.systemPrompt || ''));
+  el.historyDetailsSystemPromptChars.textContent = String(getSystemPromptChars(entry));
+  el.historyDetailsContextChars.textContent = String(getContextChars(entry));
   el.historyDetailsMessageChars.textContent = String(entry.messageChars ?? countChars(entry.message || ''));
   el.historyDetailsOutputChars.textContent = String(entry.outputChars ?? countChars(entry.answer || ''));
   el.historyDetailsInputTokens.textContent = String(entry.usage?.input_tokens ?? 0);

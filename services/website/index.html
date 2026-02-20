@@ -117,12 +117,15 @@
                     <span class="badge response-time-badge">Time: <strong id="responseTimeMs" class="ms-1">0 ms</strong></span>
                   </div>
                 </article>
-                <article class="usage-card">
-                  <h3 class="usage-card-title">Characters</h3>
-                  <div class="d-flex flex-wrap gap-2">
-                    <span class="badge response-token-badge">System+Context: <strong id="systemContextChars" class="ms-1">0</strong></span>
+                <article class="usage-card usage-card-full">
+                  <div class="d-flex align-items-center justify-content-between gap-3">
+                    <h3 class="usage-card-title mb-0">Characters</h3>
+                    <div class="usage-inline-badges d-flex align-items-center gap-2">
+                    <span class="badge response-token-badge">System Prompt: <strong id="systemPromptChars" class="ms-1">0</strong></span>
+                    <span class="badge response-cost-badge">Context: <strong id="contextChars" class="ms-1">0</strong></span>
                     <span class="badge response-cost-badge">Message: <strong id="messageChars" class="ms-1">0</strong></span>
                     <span class="badge response-time-badge">Output: <strong id="outputChars" class="ms-1">0</strong></span>
+                    </div>
                   </div>
                 </article>
               </div>
@@ -181,7 +184,8 @@
               <div class="meta-label">Deployment</div><div class="meta-value" id="historyDetailsDeployment">-</div>
               <div class="meta-label">Response Time</div><div class="meta-value" id="historyDetailsResponseTime">0 ms</div>
               <div class="meta-label">History Messages in Context</div><div class="meta-value" id="historyDetailsContextMessages">0</div>
-              <div class="meta-label">System+Context Chars</div><div class="meta-value" id="historyDetailsSystemContextChars">0</div>
+              <div class="meta-label">System Prompt Chars</div><div class="meta-value" id="historyDetailsSystemPromptChars">0</div>
+              <div class="meta-label">Context Chars</div><div class="meta-value" id="historyDetailsContextChars">0</div>
               <div class="meta-label">Message Chars</div><div class="meta-value" id="historyDetailsMessageChars">0</div>
               <div class="meta-label">Output Chars</div><div class="meta-value" id="historyDetailsOutputChars">0</div>
             </div>

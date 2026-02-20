@@ -111,6 +111,14 @@
   line-height: 1;
 }
 
+.history-chars-row .meta {
+  white-space: nowrap;
+}
+
+.history-chars-row .usage-inline-badges .badge {
+  font-size: 0.72rem;
+}
+
 .history-modal {
   position: fixed;
   inset: 0;
@@ -232,6 +240,16 @@
   font-weight: 600;
   margin: 0 0 0.5rem;
   color: #dbe6ff;
+}
+
+.usage-card-full {
+  grid-column: 1 / -1;
+}
+
+.usage-inline-badges {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
 }
 
 .usage-grid-compact {
