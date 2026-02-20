@@ -49,6 +49,12 @@
 
               <div class="mb-3">
                 <label class="form-label fw-semibold" for="message">Message</label>
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="keepMessageAfterSend" />
+                  <label class="form-check-label text-body-secondary" for="keepMessageAfterSend">
+                    keep message after send
+                  </label>
+                </div>
                 <textarea id="message" class="form-control" rows="1" placeholder="User message"></textarea>
               </div>
 
@@ -69,22 +75,28 @@
               <h2 class="h4 mb-3">Response</h2>
               <pre id="answer" class="response-box mb-3"></pre>
 
-              <div class="usage d-flex flex-column gap-2" id="usageBox">
-                <div class="usage-row d-flex flex-wrap gap-2 align-items-center">
-                  <span class="badge text-bg-secondary">Input</span>
-                  <span class="badge token-badge">Tokens: <strong id="inputTokens" class="ms-1">0</strong></span>
-                  <span class="badge cost-badge"><strong id="inputCost">$0.00000000</strong></span>
-                </div>
-                <div class="usage-row d-flex flex-wrap gap-2 align-items-center">
-                  <span class="badge text-bg-secondary">Output</span>
-                  <span class="badge token-badge">Tokens: <strong id="outputTokens" class="ms-1">0</strong></span>
-                  <span class="badge cost-badge"><strong id="outputCost">$0.00000000</strong></span>
-                </div>
-                <div class="usage-row d-flex flex-wrap gap-2 align-items-center">
-                  <span class="badge text-bg-secondary">Total</span>
-                  <span class="badge token-badge">Tokens: <strong id="totalTokens" class="ms-1">0</strong></span>
-                  <span class="badge cost-badge"><strong id="totalCost">$0.00000000</strong></span>
-                </div>
+              <div class="usage-grid" id="usageBox">
+                <article class="usage-card">
+                  <h3 class="usage-card-title">Input</h3>
+                  <div class="d-flex flex-wrap gap-2">
+                    <span class="badge response-token-badge">Tokens: <strong id="inputTokens" class="ms-1">0</strong></span>
+                    <span class="badge response-cost-badge">Cost: <strong id="inputCost" class="ms-1">$0.00000000</strong></span>
+                  </div>
+                </article>
+                <article class="usage-card">
+                  <h3 class="usage-card-title">Output</h3>
+                  <div class="d-flex flex-wrap gap-2">
+                    <span class="badge response-token-badge">Tokens: <strong id="outputTokens" class="ms-1">0</strong></span>
+                    <span class="badge response-cost-badge">Cost: <strong id="outputCost" class="ms-1">$0.00000000</strong></span>
+                  </div>
+                </article>
+                <article class="usage-card">
+                  <h3 class="usage-card-title">Total</h3>
+                  <div class="d-flex flex-wrap gap-2">
+                    <span class="badge response-token-badge">Tokens: <strong id="totalTokens" class="ms-1">0</strong></span>
+                    <span class="badge response-cost-badge">Cost: <strong id="totalCost" class="ms-1">$0.00000000</strong></span>
+                  </div>
+                </article>
               </div>
             </div>
           </section>
@@ -141,13 +153,28 @@
               <div class="meta-label">Deployment</div><div class="meta-value" id="historyDetailsDeployment">-</div>
             </div>
 
-            <div class="history-details-grid mb-0">
-              <div class="meta-label">Input Tokens</div><div class="meta-value" id="historyDetailsInputTokens">0</div>
-              <div class="meta-label">Output Tokens</div><div class="meta-value" id="historyDetailsOutputTokens">0</div>
-              <div class="meta-label">Total Tokens</div><div class="meta-value" id="historyDetailsTotalTokens">0</div>
-              <div class="meta-label">Input Cost</div><div class="meta-value" id="historyDetailsInputCost">$0.00000000</div>
-              <div class="meta-label">Output Cost</div><div class="meta-value" id="historyDetailsOutputCost">$0.00000000</div>
-              <div class="meta-label">Total Cost</div><div class="meta-value" id="historyDetailsTotalCost">$0.00000000</div>
+            <div class="usage-grid usage-grid-compact">
+              <article class="usage-card">
+                <h4 class="usage-card-title">Input</h4>
+                <div class="d-flex flex-wrap gap-2">
+                  <span class="badge response-token-badge">Tokens: <strong id="historyDetailsInputTokens" class="ms-1">0</strong></span>
+                  <span class="badge response-cost-badge">Cost: <strong id="historyDetailsInputCost" class="ms-1">$0.00000000</strong></span>
+                </div>
+              </article>
+              <article class="usage-card">
+                <h4 class="usage-card-title">Output</h4>
+                <div class="d-flex flex-wrap gap-2">
+                  <span class="badge response-token-badge">Tokens: <strong id="historyDetailsOutputTokens" class="ms-1">0</strong></span>
+                  <span class="badge response-cost-badge">Cost: <strong id="historyDetailsOutputCost" class="ms-1">$0.00000000</strong></span>
+                </div>
+              </article>
+              <article class="usage-card">
+                <h4 class="usage-card-title">Total</h4>
+                <div class="d-flex flex-wrap gap-2">
+                  <span class="badge response-token-badge">Tokens: <strong id="historyDetailsTotalTokens" class="ms-1">0</strong></span>
+                  <span class="badge response-cost-badge">Cost: <strong id="historyDetailsTotalCost" class="ms-1">$0.00000000</strong></span>
+                </div>
+              </article>
             </div>
           </div>
         </section>

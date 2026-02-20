@@ -15,6 +15,7 @@ const el = {
   deploymentWrap: document.getElementById('deploymentWrap'),
   systemPrompt: document.getElementById('systemPrompt'),
   message: document.getElementById('message'),
+  keepMessageAfterSend: document.getElementById('keepMessageAfterSend'),
   sendBtn: document.getElementById('sendBtn'),
   exportBtn: document.getElementById('exportBtn'),
   clearBtn: document.getElementById('clearBtn'),
@@ -179,7 +180,9 @@ async function onSend() {
     state.history = [...state.history, historyEntry].slice(-MAX_HISTORY);
     persistHistory();
     renderHistory();
-    el.message.value = '';
+    if (!el.keepMessageAfterSend?.checked) {
+      el.message.value = '';
+    }
     resizeMessageInput();
     setStatus('Done.');
   } catch (error) {
@@ -204,9 +207,8 @@ function renderHistory() {
             <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
             <span>${formatHistoryDate(item.createdAt)}</span>
             <span class="dot-sep">•</span>
-            <span>${item.provider}</span>
-            <span class="dot-sep">•</span>
-            <span>${item.deployment || item.model}</span>
+            <span class="badge text-bg-secondary">${item.provider}</span>
+            <span class="badge text-bg-secondary">${item.deployment || item.model}</span>
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-outline-secondary history-details-btn" data-entry-id="${item.id}" title="Show details">
@@ -223,11 +225,28 @@ function renderHistory() {
         <div><strong>System:</strong> ${escapeHtml(shorten(item.systemPrompt, 220))}</div>
         <div><strong>Message:</strong> ${escapeHtml(shorten(item.message, 220))}</div>
         <div><strong>Answer:</strong> ${escapeHtml(shorten(item.answer, 220))}</div>
-        <div class="history-metrics d-flex flex-wrap gap-2 mt-2">
-          <span class="badge text-bg-secondary">input <strong class="ms-1">${item.usage?.input_tokens ?? 0}</strong></span>
-          <span class="badge text-bg-secondary">output <strong class="ms-1">${item.usage?.output_tokens ?? 0}</strong></span>
-          <span class="badge text-bg-secondary">total <strong class="ms-1">${item.usage?.total_tokens ?? 0}</strong></span>
-          <span class="badge cost-badge"><strong>$${formatUsd(item.cost?.total_cost_usd ?? 0)}</strong></span>
+        <div class="usage-grid usage-grid-compact history-usage-grid mt-2">
+          <article class="usage-card">
+            <h4 class="usage-card-title">Input</h4>
+            <div class="d-flex flex-wrap gap-2">
+              <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage?.input_tokens ?? 0}</strong></span>
+              <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.input_cost_usd ?? 0)}</strong></span>
+            </div>
+          </article>
+          <article class="usage-card">
+            <h4 class="usage-card-title">Output</h4>
+            <div class="d-flex flex-wrap gap-2">
+              <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage?.output_tokens ?? 0}</strong></span>
+              <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.output_cost_usd ?? 0)}</strong></span>
+            </div>
+          </article>
+          <article class="usage-card">
+            <h4 class="usage-card-title">Total</h4>
+            <div class="d-flex flex-wrap gap-2">
+              <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage?.total_tokens ?? 0}</strong></span>
+              <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.total_cost_usd ?? 0)}</strong></span>
+            </div>
+          </article>
         </div>
       </article>`
     )

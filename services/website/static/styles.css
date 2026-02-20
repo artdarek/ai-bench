@@ -90,6 +90,10 @@
   gap: 0.25rem;
 }
 
+.history-meta-line .badge {
+  font-size: 0.72rem;
+}
+
 .dot-sep {
   opacity: 0.7;
   margin: 0 0.2rem;
@@ -97,6 +101,10 @@
 
 .history-metrics .badge {
   font-weight: 500;
+}
+
+.history-usage-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .history-reuse-btn {
@@ -206,9 +214,63 @@
   color: #ecffef;
 }
 
+.usage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.usage-card {
+  border: 1px solid #2c3a59;
+  border-radius: 0.7rem;
+  background: #0b1020;
+  padding: 0.7rem;
+}
+
+.usage-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+  color: #dbe6ff;
+}
+
+.usage-grid-compact {
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.usage-grid-compact .usage-card {
+  padding: 0.6rem;
+}
+
+.usage-grid-compact .usage-card-title {
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+.history-usage-grid.usage-grid-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.response-token-badge {
+  background: #ff9800;
+  color: #271700;
+}
+
+.response-cost-badge {
+  background: #2e7d32;
+  color: #ecffef;
+}
+
 @media (max-width: 576px) {
-  .usage-row .badge {
+  .usage-card .badge {
     font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .usage-grid {
+    grid-template-columns: 1fr;
   }
 }
 
