@@ -86,15 +86,27 @@
                 </div>
               </section>
 
-              <p id="status" class="status text-body-secondary mb-0 mt-3"></p>
+              <div id="status" class="status mb-0 mt-3" role="alert"></div>
             </div>
           </section>
         </aside>
 
         <section class="col-12 col-xl-8">
-          <section class="card shadow-sm border-0 mb-3 mb-md-4">
-            <div class="card-body p-3 p-md-4">
-              <h2 class="h4 mb-3">Response</h2>
+          <section id="responseCard" class="card shadow-sm border-0">
+            <ul class="nav nav-tabs history-tabs main-section-tabs px-3 px-md-4 pt-3 pt-md-4 mb-0" role="tablist" aria-label="Section tabs">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" type="button" role="tab" aria-selected="true" data-main-tab="response">
+                  <i class="bi bi-reply-fill me-1" aria-hidden="true"></i>Response
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" type="button" role="tab" aria-selected="false" data-main-tab="history">
+                  <i class="bi bi-clock-history me-1" aria-hidden="true"></i>History
+                </button>
+              </li>
+            </ul>
+
+            <div class="main-tab-panel p-3 p-md-4" data-main-panel="response">
               <div id="responseLoader" class="response-loader hidden" aria-live="polite" aria-label="Loading response">
                 <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
               </div>
@@ -171,10 +183,8 @@
                 </div>
               </div>
             </div>
-          </section>
 
-          <section class="card shadow-sm border-0">
-            <div class="card-body p-3 p-md-4">
+            <div class="main-tab-panel hidden p-3 p-md-4" data-main-panel="history">
               <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
                 <h2 class="h4 mb-0">Response History</h2>
                 <div class="d-flex flex-wrap gap-2 align-items-center">

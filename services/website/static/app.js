@@ -15,6 +15,7 @@ const state = {
   compareSelection: new Set(),
   compareEntries: [],
   uiPrefs: loadUiPrefs(),
+  hasResponseData: false,
 };
 
 const el = {
@@ -32,6 +33,7 @@ const el = {
   exportBtn: document.getElementById('exportBtn'),
   clearBtn: document.getElementById('clearBtn'),
   status: document.getElementById('status'),
+  responseCard: document.getElementById('responseCard'),
   responseLoader: document.getElementById('responseLoader'),
   responseContent: document.getElementById('responseContent'),
   answer: document.getElementById('answer'),
@@ -53,6 +55,8 @@ const el = {
   history: document.getElementById('history'),
   historyDetailsModal: document.getElementById('historyDetailsModal'),
   historyDetailsCloseBtn: document.getElementById('historyDetailsCloseBtn'),
+  mainTabButtons: Array.from(document.querySelectorAll('[data-main-tab]')),
+  mainTabPanels: Array.from(document.querySelectorAll('[data-main-panel]')),
   historyTabButtons: Array.from(document.querySelectorAll('[data-history-tab]')),
   historyTabPanels: Array.from(document.querySelectorAll('[data-history-panel]')),
   historyDetailsId: document.getElementById('historyDetailsId'),
@@ -90,7 +94,7 @@ const el = {
   compareExportBtn: document.getElementById('compareExportBtn'),
 };
 
-init().catch((error) => setStatus(`Initialization error: ${error.message}`, true));
+init().catch((error) => setStatus(`Initialization error: ${error.message}`, 'error'));
 
 async function init() {
   const response = await fetch('/api/config');
@@ -103,6 +107,7 @@ async function init() {
   setupProviderOptions();
   applyDefaultPrompts();
   applyUiPreferences();
+  setResponseHasData(false);
   setResponseLoading(false);
   renderHistory();
 
@@ -117,6 +122,7 @@ async function init() {
   el.historyConfirmCloseBtn.addEventListener('click', closeConfirmModal);
   el.historyConfirmCancelBtn.addEventListener('click', closeConfirmModal);
   el.historyConfirmActionBtn.addEventListener('click', confirmModalAction);
+  el.mainTabButtons.forEach((button) => button.addEventListener('click', onMainTabClick));
   el.historyTabButtons.forEach((button) => button.addEventListener('click', onHistoryTabClick));
   el.compareBtn.addEventListener('click', openCompareModal);
   el.compareCloseBtn.addEventListener('click', closeCompareModal);
@@ -188,7 +194,7 @@ function onHistoryToggleChange() {
 async function onSend() {
   const message = el.message.value.trim();
   if (!message) {
-    setStatus('Enter a message.', true);
+    setStatus('Enter a message.', 'warning');
     return;
   }
 
@@ -212,6 +218,7 @@ async function onSend() {
 
   toggleBusy(true);
   setResponseLoading(true);
+  setMainTab('response');
   setStatus('Sending request...');
 
   try {
@@ -233,6 +240,7 @@ async function onSend() {
     el.responseSystemPromptPreview.value = body.system_prompt || '';
     el.responseRawMessagePreview.value = JSON.stringify(payload.llm_messages || [], null, 2);
     el.answer.value = payload.answer || '';
+    setResponseHasData(true);
     el.inputTokens.textContent = String(payload.usage?.input_tokens ?? 0);
     el.outputTokens.textContent = String(payload.usage?.output_tokens ?? 0);
     el.inputCost.textContent = `$${formatUsd(payload.cost?.input_cost_usd ?? 0)}`;
@@ -273,9 +281,9 @@ async function onSend() {
       el.message.value = '';
     }
     resizeMessageInput();
-    setStatus('Done.');
+    setStatus('Done.', 'success');
   } catch (error) {
-    setStatus(error.message, true);
+    setStatus(error.message, 'error');
   } finally {
     toggleBusy(false);
     setResponseLoading(false);
@@ -296,7 +304,9 @@ function renderHistory() {
       (item) => {
         const isChecked = state.compareSelection.has(item.id);
         const isDisabled = !isChecked && state.compareSelection.size >= MAX_COMPARE;
-        return `<article class="history-item${isChecked ? ' history-item-selected' : ''}">
+        return `<div class="history-item-wrap">
+        <input class="form-check-input history-compare-cb history-compare-cb-outer" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''} title="Select for comparison (max ${MAX_COMPARE})" aria-label="Select run for comparison">
+        <article class="history-item${isChecked ? ' history-item-selected' : ''}">
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div class="meta history-meta-line">
             <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
@@ -315,7 +325,6 @@ function renderHistory() {
             <button class="btn btn-sm btn-outline-danger history-delete-btn" data-entry-id="${item.id}" title="Delete entry">
               <i class="bi bi-trash3" aria-hidden="true"></i>
             </button>
-            <input class="form-check-input history-compare-cb ms-1" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''} title="Select for comparison (max ${MAX_COMPARE})" aria-label="Select run for comparison">
           </div>
         </div>
         <div class="history-preview-grid mt-2">
@@ -376,7 +385,8 @@ function renderHistory() {
             </div>
           </article>
         </div>
-      </article>`;
+      </article>
+      </div>`;
       }
     )
     .join('');
@@ -458,7 +468,7 @@ function clearHistory() {
   persistHistory();
   renderHistory();
   updateCompareBtn();
-  setStatus('History cleared.');
+  setStatus('History cleared.', 'success');
 }
 
 function openClearConfirmModal() {
@@ -497,7 +507,7 @@ function onHistoryClick(event) {
   const entryId = actionButton.dataset.entryId;
   const entry = state.history.find((item) => item.id === entryId);
   if (!entry) {
-    setStatus('Could not find selected history entry.', true);
+    setStatus('Could not find selected history entry.', 'error');
     return;
   }
 
@@ -530,13 +540,13 @@ function onHistoryClick(event) {
     el.systemPrompt.value = entry.systemPrompt || '';
     el.message.value = entry.message || '';
     resizeMessageInput();
-    setStatus('History entry loaded into form.');
+    setStatus('History entry loaded into form.', 'success');
   }
 }
 
 function exportCsv() {
   if (!state.history.length) {
-    setStatus('No data to export.', true);
+    setStatus('No data to export.', 'warning');
     return;
   }
 
@@ -600,7 +610,7 @@ function exportCsv() {
   link.remove();
   URL.revokeObjectURL(url);
 
-  setStatus('CSV downloaded.');
+  setStatus('CSV downloaded.', 'success');
 }
 
 function toggleBusy(isBusy) {
@@ -613,9 +623,25 @@ function setResponseLoading(isLoading) {
   el.responseContent.classList.toggle('hidden', isLoading);
 }
 
-function setStatus(text, isError = false) {
+function setResponseHasData(hasData) {
+  state.hasResponseData = Boolean(hasData);
+  el.responseContent.classList.toggle('response-empty', !state.hasResponseData);
+}
+
+function setStatus(text, type = 'info') {
+  if (!text) {
+    el.status.textContent = '';
+    el.status.className = 'status';
+    return;
+  }
+  const alertClass = {
+    success: 'alert-success',
+    error: 'alert-danger',
+    warning: 'alert-warning',
+    info: 'alert-info',
+  }[type] || 'alert-info';
   el.status.textContent = text;
-  el.status.style.color = isError ? '#ff6b6b' : '#9fb0ce';
+  el.status.className = `status alert ${alertClass} mt-3`;
 }
 
 function formatUsd(value) {
@@ -825,7 +851,28 @@ function confirmDeleteHistoryEntry() {
   renderHistory();
   updateCompareBtn();
   closeConfirmModal();
-  setStatus('History entry deleted.');
+  setStatus('History entry deleted.', 'success');
+}
+
+function onMainTabClick(event) {
+  const tabName = event.currentTarget?.dataset?.mainTab;
+  if (!tabName) {
+    return;
+  }
+  setMainTab(tabName);
+}
+
+function setMainTab(tabName) {
+  el.mainTabButtons.forEach((button) => {
+    const isActive = button.dataset.mainTab === tabName;
+    button.classList.toggle('active', isActive);
+    button.setAttribute('aria-selected', String(isActive));
+  });
+
+  el.mainTabPanels.forEach((panel) => {
+    const isActive = panel.dataset.mainPanel === tabName;
+    panel.classList.toggle('hidden', !isActive);
+  });
 }
 
 function onHistoryTabClick(event) {
