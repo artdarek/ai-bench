@@ -1,0 +1,27 @@
+config/nginx.conf
+  805483002b4cfd07 16-18
+services/website/static/styles.css
+  805483002b4cfd07 110-112,114-117
+services/website/static/app.js
+  805483002b4cfd07 276,281,283,293
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "3f1dda08317b0a991d299d531a3fda4afa885c53",
+  "prompts": {
+    "805483002b4cfd07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b4ae1fa-c674-486b-8329-29259987ffc1",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 15,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    }
+  }
+}
