@@ -303,3 +303,85 @@
     top: 1rem;
   }
 }
+
+/* History item selected state */
+.history-item-selected {
+  border-color: #f0a500 !important;
+  background: #131a0e !important;
+}
+
+.compare-count-label {
+  font-size: 0.8rem;
+}
+
+/* Compare modal */
+.compare-modal-panel {
+  width: min(1200px, 100%) !important;
+}
+
+.compare-table-wrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 72vh;
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  color: #dbe6ff;
+}
+
+.compare-th {
+  background: #0b1020;
+  border: 1px solid #2c3a59;
+  padding: 0.55rem 0.85rem;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.compare-th-metric {
+  min-width: 180px;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+}
+
+.compare-th-entry {
+  min-width: 200px;
+  color: #f0a500;
+}
+
+.compare-td {
+  border: 1px solid #2c3a59;
+  padding: 0.5rem 0.85rem;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.compare-td-label {
+  background: #0b1020;
+  color: #8ba0c7;
+  font-weight: 500;
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.compare-td-text {
+  white-space: pre-wrap;
+  min-width: 200px;
+  max-width: 340px;
+  font-size: 0.82rem;
+  color: #b8c9e8;
+}
+
+.compare-table tr:hover td,
+.compare-table tr:hover th.compare-td-label {
+  background: #12213a;
+}

@@ -4,10 +4,14 @@ const DEFAULT_SYSTEM_PROMPT =
   'You are a friendly and polite assistant. Be warm, helpful, and concise in your responses.';
 const DEFAULT_MESSAGE = 'How are you?';
 
+const MAX_COMPARE = 10;
+
 const state = {
   config: null,
   history: loadHistory(),
   pendingDeleteEntryId: null,
+  compareSelection: new Set(),
+  compareEntries: [],
 };
 
 const el = {
@@ -66,6 +70,13 @@ const el = {
   historyDeleteCloseBtn: document.getElementById('historyDeleteCloseBtn'),
   historyDeleteCancelBtn: document.getElementById('historyDeleteCancelBtn'),
   historyDeleteConfirmBtn: document.getElementById('historyDeleteConfirmBtn'),
+  compareBtn: document.getElementById('compareBtn'),
+  compareCount: document.getElementById('compareCount'),
+  compareModal: document.getElementById('compareModal'),
+  compareCloseBtn: document.getElementById('compareCloseBtn'),
+  compareTableHead: document.getElementById('compareTableHead'),
+  compareTableBody: document.getElementById('compareTableBody'),
+  compareExportBtn: document.getElementById('compareExportBtn'),
 };
 
 init().catch((error) => setStatus(`Initialization error: ${error.message}`, true));
@@ -93,6 +104,10 @@ async function init() {
   el.historyDeleteCancelBtn.addEventListener('click', closeDeleteConfirmModal);
   el.historyDeleteConfirmBtn.addEventListener('click', confirmDeleteHistoryEntry);
   el.historyTabButtons.forEach((button) => button.addEventListener('click', onHistoryTabClick));
+  el.compareBtn.addEventListener('click', openCompareModal);
+  el.compareCloseBtn.addEventListener('click', closeCompareModal);
+  el.compareModal.addEventListener('click', onCompareModalClick);
+  el.compareExportBtn.addEventListener('click', exportCompareCsv);
   document.addEventListener('keydown', onGlobalKeyDown);
   el.sendBtn.addEventListener('click', onSend);
   el.exportBtn.addEventListener('click', exportCsv);
@@ -253,14 +268,22 @@ function renderHistory() {
   const sorted = [...state.history].reverse();
   el.history.innerHTML = sorted
     .map(
-      (item) => `<article class="history-item">
+      (item) => {
+        const isChecked = state.compareSelection.has(item.id);
+        const isDisabled = !isChecked && state.compareSelection.size >= MAX_COMPARE;
+        return `<article class="history-item${isChecked ? ' history-item-selected' : ''}">
         <div class="d-flex justify-content-between align-items-start gap-2">
-          <div class="meta history-meta-line">
-            <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
-            <span>${formatHistoryDate(item.createdAt)}</span>
-            <span class="dot-sep">•</span>
-            <span class="badge text-bg-secondary">${item.provider}</span>
-            <span class="badge text-bg-secondary">${item.deployment || item.model}</span>
+          <div class="d-flex align-items-start gap-2">
+            <div class="form-check mb-0 mt-1">
+              <input class="form-check-input history-compare-cb" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''} title="Select for comparison (max ${MAX_COMPARE})" aria-label="Select run for comparison">
+            </div>
+            <div class="meta history-meta-line">
+              <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+              <span>${formatHistoryDate(item.createdAt)}</span>
+              <span class="dot-sep">•</span>
+              <span class="badge text-bg-secondary">${item.provider}</span>
+              <span class="badge text-bg-secondary">${item.deployment || item.model}</span>
+            </div>
           </div>
           <div class="d-flex gap-2">
             <button class="btn btn-sm btn-outline-secondary history-details-btn" data-entry-id="${item.id}" title="Show details">
@@ -316,7 +339,8 @@ function renderHistory() {
             </div>
           </article>
         </div>
-      </article>`
+      </article>`;
+      }
     )
     .join('');
 }
@@ -360,12 +384,31 @@ function persistHistory() {
 
 function clearHistory() {
   state.history = [];
+  state.compareSelection.clear();
   persistHistory();
   renderHistory();
+  updateCompareBtn();
   setStatus('History cleared.');
 }
 
 function onHistoryClick(event) {
+  const checkbox = event.target.closest('.history-compare-cb');
+  if (checkbox) {
+    const entryId = checkbox.dataset.entryId;
+    if (checkbox.checked) {
+      if (state.compareSelection.size < MAX_COMPARE) {
+        state.compareSelection.add(entryId);
+      } else {
+        checkbox.checked = false;
+      }
+    } else {
+      state.compareSelection.delete(entryId);
+    }
+    updateCompareBtn();
+    renderHistory();
+    return;
+  }
+
   const actionButton = event.target.closest('.history-reuse-btn, .history-details-btn, .history-delete-btn');
   if (!actionButton) {
     return;
@@ -598,6 +641,10 @@ function onModalClick(event) {
 }
 
 function onGlobalKeyDown(event) {
+  if (event.key === 'Escape' && !el.compareModal.classList.contains('hidden')) {
+    closeCompareModal();
+    return;
+  }
   if (event.key === 'Escape' && !el.historyDetailsModal.classList.contains('hidden')) {
     closeHistoryDetailsModal();
     return;
@@ -660,9 +707,11 @@ function confirmDeleteHistoryEntry() {
     return;
   }
 
+  state.compareSelection.delete(state.pendingDeleteEntryId);
   state.history = state.history.filter((item) => item.id !== state.pendingDeleteEntryId);
   persistHistory();
   renderHistory();
+  updateCompareBtn();
   closeDeleteConfirmModal();
   setStatus('History entry deleted.');
 }
@@ -686,4 +735,105 @@ function setHistoryTab(tabName) {
     const isActive = panel.dataset.historyPanel === tabName;
     panel.classList.toggle('hidden', !isActive);
   });
+}
+
+function updateCompareBtn() {
+  const count = state.compareSelection.size;
+  const visible = count >= 2;
+  el.compareBtn.classList.toggle('hidden', !visible);
+  el.compareCount.classList.toggle('hidden', count === 0);
+  if (count > 0) {
+    el.compareCount.textContent = `${count}/${MAX_COMPARE} selected`;
+  }
+}
+
+function getCompareMetrics() {
+  return [
+    { label: 'Run ID', fn: (e) => e.id },
+    { label: 'Date', fn: (e) => formatHistoryDate(e.createdAt) },
+    { label: 'Provider', fn: (e) => e.provider || '-' },
+    { label: 'Model / Deployment', fn: (e) => e.deployment || e.model || '-' },
+    { label: 'Response Time', fn: (e) => formatResponseTimeMs(e.responseTimeMs) },
+    { label: 'Context Messages', fn: (e) => String(e.contextMessagesCount ?? e.contextPairsCount ?? 0) },
+    { label: 'System Prompt Chars', fn: (e) => String(getSystemPromptChars(e)) },
+    { label: 'Context Chars', fn: (e) => String(getContextChars(e)) },
+    { label: 'Message Chars', fn: (e) => String(e.messageChars ?? countChars(e.message || '')) },
+    { label: 'Output Chars', fn: (e) => String(e.outputChars ?? countChars(e.answer || '')) },
+    { label: 'Input Tokens', fn: (e) => String(e.usage?.input_tokens ?? 0) },
+    { label: 'Output Tokens', fn: (e) => String(e.usage?.output_tokens ?? 0) },
+    { label: 'Total Tokens', fn: (e) => String(e.usage?.total_tokens ?? 0) },
+    { label: 'Input Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_cost_usd ?? 0)}` },
+    { label: 'Output Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.output_cost_usd ?? 0)}` },
+    { label: 'Total Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.total_cost_usd ?? 0)}` },
+    { label: 'System Prompt', fn: (e) => e.systemPrompt || '' },
+    { label: 'Message', fn: (e) => e.message || '' },
+    { label: 'Answer', fn: (e) => e.answer || '' },
+  ];
+}
+
+function openCompareModal() {
+  const entries = [...state.compareSelection]
+    .map((id) => state.history.find((item) => item.id === id))
+    .filter(Boolean);
+
+  if (entries.length < 2) {
+    return;
+  }
+
+  state.compareEntries = entries;
+  const metrics = getCompareMetrics();
+  const textMetricLabels = new Set(['System Prompt', 'Message', 'Answer']);
+
+  const headCols = entries
+    .map((_, i) => `<th class="compare-th compare-th-entry" scope="col">Run ${i + 1}</th>`)
+    .join('');
+  el.compareTableHead.innerHTML = `<tr><th class="compare-th compare-th-metric" scope="col">Metric</th>${headCols}</tr>`;
+
+  const bodyRows = metrics
+    .map((metric) => {
+      const isText = textMetricLabels.has(metric.label);
+      const values = entries.map((e) => metric.fn(e));
+      const cells = values
+        .map((v) => `<td class="compare-td${isText ? ' compare-td-text' : ''}">${escapeHtml(isText ? shorten(v, 300) : v)}</td>`)
+        .join('');
+      return `<tr><th class="compare-td compare-td-label" scope="row">${escapeHtml(metric.label)}</th>${cells}</tr>`;
+    })
+    .join('');
+
+  el.compareTableBody.innerHTML = bodyRows;
+  el.compareModal.classList.remove('hidden');
+}
+
+function exportCompareCsv() {
+  const entries = state.compareEntries;
+  if (!entries || entries.length < 2) {
+    return;
+  }
+
+  const metrics = getCompareMetrics();
+  const header = ['Metric', ...entries.map((_, i) => `Run ${i + 1}`)];
+  const rows = metrics.map((metric) => [metric.label, ...entries.map((e) => metric.fn(e))]);
+  const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const now = new Date();
+  const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+  link.href = url;
+  link.download = `aibench-compare-${stamp}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function closeCompareModal() {
+  el.compareModal.classList.add('hidden');
+}
+
+function onCompareModalClick(event) {
+  if (event.target.closest('[data-close-compare-modal="true"]')) {
+    closeCompareModal();
+  }
 }
