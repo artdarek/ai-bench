@@ -581,7 +581,7 @@
   background: #f3f6fa;
 }
 
-/* Main section tabs (Response / History) */
+/* Main section tabs (Response / History / Charts) */
 .main-section-tabs {
   border-radius: 0;
   border-bottom-color: var(--border);
@@ -589,4 +589,13 @@
 
 .main-tab-panel {
   min-height: 0;
+}
+
+.chart-select {
+  max-width: 280px;
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  height: 380px;
 }

@@ -16,6 +16,9 @@ const state = {
   compareEntries: [],
   uiPrefs: loadUiPrefs(),
   hasResponseData: false,
+  chartInstance: null,
+  chartInstance2: null,
+  chartInstance3: null,
 };
 
 const el = {
@@ -92,6 +95,14 @@ const el = {
   compareTableHead: document.getElementById('compareTableHead'),
   compareTableBody: document.getElementById('compareTableBody'),
   compareExportBtn: document.getElementById('compareExportBtn'),
+  chartSelect: document.getElementById('chartSelect'),
+  mainChart: document.getElementById('mainChart'),
+  mainChart2: document.getElementById('mainChart2'),
+  mainChart3: document.getElementById('mainChart3'),
+  chartsEmpty: document.getElementById('chartsEmpty'),
+  chartsWrap: document.getElementById('chartsWrap'),
+  chartsWrap2: document.getElementById('chartsWrap2'),
+  chartsWrap3: document.getElementById('chartsWrap3'),
 };
 
 init().catch((error) => setStatus(`Initialization error: ${error.message}`, 'error'));
@@ -124,6 +135,7 @@ async function init() {
   el.historyConfirmActionBtn.addEventListener('click', confirmModalAction);
   el.mainTabButtons.forEach((button) => button.addEventListener('click', onMainTabClick));
   el.historyTabButtons.forEach((button) => button.addEventListener('click', onHistoryTabClick));
+  el.chartSelect.addEventListener('change', renderChart);
   el.compareBtn.addEventListener('click', openCompareModal);
   el.compareCloseBtn.addEventListener('click', closeCompareModal);
   el.compareModal.addEventListener('click', onCompareModalClick);
@@ -873,6 +885,10 @@ function setMainTab(tabName) {
     const isActive = panel.dataset.mainPanel === tabName;
     panel.classList.toggle('hidden', !isActive);
   });
+
+  if (tabName === 'charts') {
+    renderChart();
+  }
 }
 
 function onHistoryTabClick(event) {
@@ -991,4 +1007,358 @@ function onCompareModalClick(event) {
   if (event.target.closest('[data-close-compare-modal="true"]')) {
     closeCompareModal();
   }
+}
+
+// ─── Charts ────────────────────────────────────────────────────────────────
+
+function renderChart() {
+  const sorted = [...state.history].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  if (!sorted.length) {
+    el.chartsEmpty.classList.remove('hidden');
+    el.chartsWrap.classList.add('hidden');
+    return;
+  }
+
+  el.chartsEmpty.classList.add('hidden');
+  el.chartsWrap.classList.remove('hidden');
+
+  if (state.chartInstance)  { state.chartInstance.destroy();  state.chartInstance  = null; }
+  if (state.chartInstance2) { state.chartInstance2.destroy(); state.chartInstance2 = null; }
+  if (state.chartInstance3) { state.chartInstance3.destroy(); state.chartInstance3 = null; }
+
+  const builders = {
+    cumulativeCost:        buildCumulativeCostChart,
+    cumulativeTokens:      buildCumulativeTokensChart,
+    tokensVsResponseTime:  buildTokensVsResponseTimeCharts,
+  };
+
+  const result = builders[el.chartSelect.value]?.(sorted) ?? null;
+  if (Array.isArray(result)) {
+    [state.chartInstance, state.chartInstance2, state.chartInstance3] = result;
+    el.chartsWrap2.classList.remove('hidden');
+    el.chartsWrap3.classList.toggle('hidden', result.length < 3);
+  } else {
+    state.chartInstance = result;
+    el.chartsWrap2.classList.add('hidden');
+    el.chartsWrap3.classList.add('hidden');
+  }
+}
+
+function chartShortDate(iso) {
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+const CHART_GRID = { color: 'rgba(0,0,0,0.05)' };
+const CHART_FONT = { size: 11 };
+
+const CROSSHAIR_PLUGIN = {
+  id: 'crosshair',
+  afterDraw(chart) {
+    if (!chart.tooltip?._active?.length) return;
+    const { ctx, chartArea: { top, bottom } } = chart;
+    const x = chart.tooltip._active[0].element.x;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+    ctx.setLineDash([5, 4]);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
+function syncChartHover(source, targets) {
+  const all = Array.isArray(targets) ? targets : [targets];
+  source.canvas.addEventListener('mousemove', (e) => {
+    const elements = source.getElementsAtEventForMode(e, 'index', { intersect: false }, false);
+    if (!elements.length) return;
+    const { index } = elements[0];
+    for (const target of all) {
+      const activeEls = target.data.datasets.map((_, i) => ({ datasetIndex: i, index }));
+      target.tooltip.setActiveElements(activeEls, { x: 0, y: 0 });
+      target.setActiveElements(activeEls);
+      target.update('none');
+    }
+  });
+  source.canvas.addEventListener('mouseleave', () => {
+    for (const target of all) {
+      target.tooltip.setActiveElements([], { x: 0, y: 0 });
+      target.setActiveElements([]);
+      target.update('none');
+    }
+  });
+}
+
+function buildTokensVsResponseTimeCharts(sorted) {
+  const labels = sorted.map((_, i) => `#${i + 1}`);
+
+  const tokensChart = new Chart(el.mainChart, {
+    type: 'line',
+    plugins: [CROSSHAIR_PLUGIN],
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Total tokens',
+          data: sorted.map((item) => item.usage?.total_tokens ?? 0),
+          borderColor: '#dc2626',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+        {
+          label: 'Input tokens',
+          data: sorted.map((item) => item.usage?.input_tokens ?? 0),
+          borderColor: '#16a34a',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+        {
+          label: 'Output tokens',
+          data: sorted.map((item) => item.usage?.output_tokens ?? 0),
+          borderColor: '#2563eb',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } },
+      },
+      scales: {
+        x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxTicksLimit: 20 } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT }, afterFit: (s) => { s.width = 88; } },
+      },
+    },
+  });
+
+  const timeChart = new Chart(el.mainChart2, {
+    type: 'line',
+    plugins: [CROSSHAIR_PLUGIN],
+    data: {
+      labels,
+      datasets: [{
+        label: 'Response time',
+        data: sorted.map((item) => item.responseTimeMs ?? 0),
+        borderColor: '#ea580c',
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        borderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: false,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.raw} ms` } },
+      },
+      scales: {
+        x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxTicksLimit: 20 } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, callback: (v) => `${v} ms` }, afterFit: (s) => { s.width = 88; } },
+      },
+    },
+  });
+
+  syncChartHover(tokensChart, timeChart);
+  const costChart = new Chart(el.mainChart3, {
+    type: 'line',
+    plugins: [CROSSHAIR_PLUGIN],
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Total cost',
+          data: sorted.map((item) => item.cost?.total_cost_usd ?? 0),
+          borderColor: '#dc2626',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+        {
+          label: 'Input cost',
+          data: sorted.map((item) => item.cost?.input_cost_usd ?? 0),
+          borderColor: '#16a34a',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+        {
+          label: 'Output cost',
+          data: sorted.map((item) => item.cost?.output_cost_usd ?? 0),
+          borderColor: '#2563eb',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } },
+        tooltip: { callbacks: { label: (ctx) => `$${Number(ctx.raw).toFixed(8)}` } },
+      },
+      scales: {
+        x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxTicksLimit: 20 } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, callback: (v) => `$${Number(v).toFixed(6)}` }, afterFit: (s) => { s.width = 88; } },
+      },
+    },
+  });
+
+  syncChartHover(tokensChart, [timeChart, costChart]);
+  syncChartHover(timeChart,   [tokensChart, costChart]);
+  syncChartHover(costChart,   [tokensChart, timeChart]);
+
+  return [tokensChart, timeChart, costChart];
+}
+
+function buildCumulativeTokensChart(sorted) {
+  let cumInput = 0, cumOutput = 0, cumTotal = 0;
+  const inputData  = sorted.map((item) => { cumInput  += item.usage?.input_tokens  ?? 0; return cumInput; });
+  const outputData = sorted.map((item) => { cumOutput += item.usage?.output_tokens ?? 0; return cumOutput; });
+  const totalData  = sorted.map((item) => { cumTotal  += item.usage?.total_tokens  ?? 0; return cumTotal; });
+
+  return new Chart(el.mainChart, {
+    type: 'line',
+    data: {
+      labels: sorted.map((item) => chartShortDate(item.createdAt)),
+      datasets: [
+        {
+          label: 'Total tokens',
+          data: totalData,
+          borderColor: '#dc2626',
+          backgroundColor: 'rgba(220,38,38,0.08)',
+          tension: 0.1,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+        {
+          label: 'Input tokens',
+          data: inputData,
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22,163,74,0.08)',
+          tension: 0.1,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+        {
+          label: 'Output tokens',
+          data: outputData,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37,99,235,0.08)',
+          tension: 0.1,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } },
+      },
+      scales: {
+        x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxRotation: 30, maxTicksLimit: 20 } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT } },
+      },
+    },
+  });
+}
+
+function buildCumulativeCostChart(sorted) {
+  let cumInput = 0, cumOutput = 0, cumTotal = 0;
+  const inputData  = sorted.map((item) => { cumInput  += item.cost?.input_cost_usd  ?? 0; return parseFloat(cumInput.toFixed(8)); });
+  const outputData = sorted.map((item) => { cumOutput += item.cost?.output_cost_usd ?? 0; return parseFloat(cumOutput.toFixed(8)); });
+  const totalData  = sorted.map((item) => { cumTotal  += item.cost?.total_cost_usd  ?? 0; return parseFloat(cumTotal.toFixed(8)); });
+
+  return new Chart(el.mainChart, {
+    type: 'line',
+    data: {
+      labels: sorted.map((item) => chartShortDate(item.createdAt)),
+      datasets: [
+        {
+          label: 'Total cost',
+          data: totalData,
+          borderColor: '#dc2626',
+          backgroundColor: 'rgba(220,38,38,0.08)',
+          tension: 0.1,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+        {
+          label: 'Input cost',
+          data: inputData,
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22,163,74,0.08)',
+          tension: 0.1,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+        {
+          label: 'Output cost',
+          data: outputData,
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37,99,235,0.08)',
+          tension: 0.1,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } },
+        tooltip: { callbacks: { label: (ctx) => `$${Number(ctx.raw).toFixed(8)}` } },
+      },
+      scales: {
+        x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxRotation: 30, maxTicksLimit: 20 } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, callback: (v) => `$${Number(v).toFixed(6)}` } },
+      },
+    },
+  });
 }

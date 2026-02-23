@@ -104,6 +104,11 @@
                   <i class="bi bi-clock-history me-1" aria-hidden="true"></i>History
                 </button>
               </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" type="button" role="tab" aria-selected="false" data-main-tab="charts">
+                  <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>Charts
+                </button>
+              </li>
             </ul>
 
             <div class="main-tab-panel p-3 p-md-4" data-main-panel="response">
@@ -200,6 +205,31 @@
                 </div>
               </div>
               <div id="history" class="history"></div>
+            </div>
+
+            <div class="main-tab-panel hidden p-3 p-md-4" data-main-panel="charts">
+              <div class="control-group mb-4">
+                <label class="form-label fw-semibold mb-2" for="chartSelect">
+                  <i class="bi bi-bar-chart label-icon" aria-hidden="true"></i>Chart
+                </label>
+                <select id="chartSelect" class="form-select chart-select">
+                  <option value="tokensVsResponseTime" selected>Token vs Response Time vs Cost</option>
+                  <option value="cumulativeCost">Cumulative cost</option>
+                  <option value="cumulativeTokens">Cumulative token usage</option>
+                </select>
+              </div>
+              <p id="chartsEmpty" class="text-body-secondary hidden">No history data to display charts.</p>
+              <div id="chartsWrap">
+                <div class="chart-canvas-wrap">
+                  <canvas id="mainChart"></canvas>
+                </div>
+                <div id="chartsWrap2" class="chart-canvas-wrap mt-3 hidden">
+                  <canvas id="mainChart2"></canvas>
+                </div>
+                <div id="chartsWrap3" class="chart-canvas-wrap mt-3 hidden">
+                  <canvas id="mainChart3"></canvas>
+                </div>
+              </div>
             </div>
           </section>
         </section>
@@ -341,6 +371,7 @@
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script type="module" src="/static/app.js"></script>
   </body>
 </html>
