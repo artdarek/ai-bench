@@ -1,11 +1,12 @@
 {
   "providers": {
-    "openai": {
-      "label": "OpenAI",
-      "models": [
+    "azure": {
+      "label": "Azure OpenAI",
+      "deployments": [
         {
-          "id": "gpt-5-mini",
-          "label": "gpt-5-mini"
+          "name": "gpt-5-mini",
+          "model": "gpt-5-mini",
+          "label": "gpt5-mini (gpt-5-mini)"
         }
       ],
       "pricing": {
@@ -15,13 +16,12 @@
         }
       }
     },
-    "azure": {
-      "label": "Azure OpenAI",
-      "deployments": [
+    "openai": {
+      "label": "OpenAI",
+      "models": [
         {
-          "name": "gpt-5-mini",
-          "model": "gpt-5-mini",
-          "label": "gpt5-mini (gpt-5-mini)"
+          "id": "gpt-5-mini",
+          "label": "gpt-5-mini"
         }
       ],
       "pricing": {

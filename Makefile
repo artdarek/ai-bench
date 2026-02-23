@@ -84,7 +84,8 @@ deploy-docker-reload:
 
 ## Open SSH session to remote server
 ssh:
-	ssh "$(REMOTE_USER)@$(REMOTE_HOST)" -p "$(REMOTE_PORT)"
+	ssh -t -p "$(REMOTE_PORT)" "$(REMOTE_USER)@$(REMOTE_HOST)" \
+		"cd '$(REMOTE_WWW_PATH)' && exec $${SHELL:-/bin/bash} -l"
 
 ## Show available commands
 help:

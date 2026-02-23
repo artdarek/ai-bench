@@ -107,8 +107,14 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.history-reuse-btn {
+.history-details-btn,
+.history-reuse-btn,
+.history-delete-btn {
   line-height: 1;
+  aspect-ratio: 1;
+  padding-left: 0;
+  padding-right: 0;
+  width: 2rem;
 }
 
 .history-chars-row .meta {

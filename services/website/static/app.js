@@ -273,19 +273,14 @@ function renderHistory() {
         const isDisabled = !isChecked && state.compareSelection.size >= MAX_COMPARE;
         return `<article class="history-item${isChecked ? ' history-item-selected' : ''}">
         <div class="d-flex justify-content-between align-items-start gap-2">
-          <div class="d-flex align-items-start gap-2">
-            <div class="form-check mb-0 mt-1">
-              <input class="form-check-input history-compare-cb" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''} title="Select for comparison (max ${MAX_COMPARE})" aria-label="Select run for comparison">
-            </div>
-            <div class="meta history-meta-line">
-              <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
-              <span>${formatHistoryDate(item.createdAt)}</span>
-              <span class="dot-sep">•</span>
-              <span class="badge text-bg-secondary">${item.provider}</span>
-              <span class="badge text-bg-secondary">${item.deployment || item.model}</span>
-            </div>
+          <div class="meta history-meta-line">
+            <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+            <span>${formatHistoryDate(item.createdAt)}</span>
+            <span class="dot-sep">•</span>
+            <span class="badge text-bg-secondary">${item.provider}</span>
+            <span class="badge text-bg-secondary">${item.deployment || item.model}</span>
           </div>
-          <div class="d-flex gap-2">
+          <div class="d-flex align-items-center gap-2">
             <button class="btn btn-sm btn-outline-secondary history-details-btn" data-entry-id="${item.id}" title="Show details">
               <i class="bi bi-info-circle" aria-hidden="true"></i>
             </button>
@@ -295,6 +290,7 @@ function renderHistory() {
             <button class="btn btn-sm btn-outline-danger history-delete-btn" data-entry-id="${item.id}" title="Delete entry">
               <i class="bi bi-trash3" aria-hidden="true"></i>
             </button>
+            <input class="form-check-input history-compare-cb ms-1" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''} title="Select for comparison (max ${MAX_COMPARE})" aria-label="Select run for comparison">
           </div>
         </div>
         <div><strong>System:</strong> ${escapeHtml(shorten(item.systemPrompt, 220))}</div>
