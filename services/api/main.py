@@ -196,6 +196,7 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
             'deployment': payload.deployment,
             'resolved_model': model_name,
         },
+        'llm_messages': messages,
         'answer': content,
         'usage': usage.model_dump(),
         'cost': cost.model_dump(),

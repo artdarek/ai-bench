@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'aibench_history_v1';
+const UI_PREFS_KEY = 'aibench_ui_prefs_v1';
 const MAX_HISTORY = 300;
 const DEFAULT_SYSTEM_PROMPT =
   'You are a friendly and polite assistant. Be warm, helpful, and concise in your responses.';
@@ -10,8 +11,10 @@ const state = {
   config: null,
   history: loadHistory(),
   pendingDeleteEntryId: null,
+  pendingConfirmAction: null,
   compareSelection: new Set(),
   compareEntries: [],
+  uiPrefs: loadUiPrefs(),
 };
 
 const el = {
@@ -29,7 +32,12 @@ const el = {
   exportBtn: document.getElementById('exportBtn'),
   clearBtn: document.getElementById('clearBtn'),
   status: document.getElementById('status'),
+  responseLoader: document.getElementById('responseLoader'),
+  responseContent: document.getElementById('responseContent'),
   answer: document.getElementById('answer'),
+  responseMessagePreview: document.getElementById('responseMessagePreview'),
+  responseSystemPromptPreview: document.getElementById('responseSystemPromptPreview'),
+  responseRawMessagePreview: document.getElementById('responseRawMessagePreview'),
   inputTokens: document.getElementById('inputTokens'),
   outputTokens: document.getElementById('outputTokens'),
   inputCost: document.getElementById('inputCost'),
@@ -66,13 +74,15 @@ const el = {
   historyDetailsTotalCost: document.getElementById('historyDetailsTotalCost'),
   historyDetailsSystemPrompt: document.getElementById('historyDetailsSystemPrompt'),
   historyDetailsMessage: document.getElementById('historyDetailsMessage'),
+  historyDetailsLlmMessages: document.getElementById('historyDetailsLlmMessages'),
   historyDetailsAnswer: document.getElementById('historyDetailsAnswer'),
-  historyDeleteConfirmModal: document.getElementById('historyDeleteConfirmModal'),
-  historyDeleteCloseBtn: document.getElementById('historyDeleteCloseBtn'),
-  historyDeleteCancelBtn: document.getElementById('historyDeleteCancelBtn'),
-  historyDeleteConfirmBtn: document.getElementById('historyDeleteConfirmBtn'),
+  historyConfirmModal: document.getElementById('historyConfirmModal'),
+  historyConfirmTitle: document.getElementById('historyConfirmTitle'),
+  historyConfirmMessage: document.getElementById('historyConfirmMessage'),
+  historyConfirmCloseBtn: document.getElementById('historyConfirmCloseBtn'),
+  historyConfirmCancelBtn: document.getElementById('historyConfirmCancelBtn'),
+  historyConfirmActionBtn: document.getElementById('historyConfirmActionBtn'),
   compareBtn: document.getElementById('compareBtn'),
-  compareCount: document.getElementById('compareCount'),
   compareModal: document.getElementById('compareModal'),
   compareCloseBtn: document.getElementById('compareCloseBtn'),
   compareTableHead: document.getElementById('compareTableHead'),
@@ -92,18 +102,21 @@ async function init() {
   state.config = payload;
   setupProviderOptions();
   applyDefaultPrompts();
+  applyUiPreferences();
+  setResponseLoading(false);
   renderHistory();
 
   el.provider.addEventListener('change', onProviderChange);
   el.message.addEventListener('input', resizeMessageInput);
   el.includeConversationHistory.addEventListener('change', onHistoryToggleChange);
+  el.keepMessageAfterSend.addEventListener('change', onKeepMessageAfterSendChange);
   el.history.addEventListener('click', onHistoryClick);
   el.historyDetailsModal.addEventListener('click', onModalClick);
   el.historyDetailsCloseBtn.addEventListener('click', closeHistoryDetailsModal);
-  el.historyDeleteConfirmModal.addEventListener('click', onDeleteModalClick);
-  el.historyDeleteCloseBtn.addEventListener('click', closeDeleteConfirmModal);
-  el.historyDeleteCancelBtn.addEventListener('click', closeDeleteConfirmModal);
-  el.historyDeleteConfirmBtn.addEventListener('click', confirmDeleteHistoryEntry);
+  el.historyConfirmModal.addEventListener('click', onConfirmModalClick);
+  el.historyConfirmCloseBtn.addEventListener('click', closeConfirmModal);
+  el.historyConfirmCancelBtn.addEventListener('click', closeConfirmModal);
+  el.historyConfirmActionBtn.addEventListener('click', confirmModalAction);
   el.historyTabButtons.forEach((button) => button.addEventListener('click', onHistoryTabClick));
   el.compareBtn.addEventListener('click', openCompareModal);
   el.compareCloseBtn.addEventListener('click', closeCompareModal);
@@ -112,7 +125,7 @@ async function init() {
   document.addEventListener('keydown', onGlobalKeyDown);
   el.sendBtn.addEventListener('click', onSend);
   el.exportBtn.addEventListener('click', exportCsv);
-  el.clearBtn.addEventListener('click', clearHistory);
+  el.clearBtn.addEventListener('click', openClearConfirmModal);
   onHistoryToggleChange();
   resizeMessageInput();
 }
@@ -168,6 +181,8 @@ function onProviderChange() {
 function onHistoryToggleChange() {
   const enabled = Boolean(el.includeConversationHistory?.checked);
   el.historyMessageLimit.disabled = !enabled;
+  state.uiPrefs.includeConversationHistory = enabled;
+  persistUiPrefs();
 }
 
 async function onSend() {
@@ -196,6 +211,7 @@ async function onSend() {
   }
 
   toggleBusy(true);
+  setResponseLoading(true);
   setStatus('Sending request...');
 
   try {
@@ -213,7 +229,10 @@ async function onSend() {
     }
     const outputChars = countChars(payload.answer || '');
 
-    el.answer.textContent = payload.answer || '';
+    el.responseMessagePreview.value = body.message || '';
+    el.responseSystemPromptPreview.value = body.system_prompt || '';
+    el.responseRawMessagePreview.value = JSON.stringify(payload.llm_messages || [], null, 2);
+    el.answer.value = payload.answer || '';
     el.inputTokens.textContent = String(payload.usage?.input_tokens ?? 0);
     el.outputTokens.textContent = String(payload.usage?.output_tokens ?? 0);
     el.inputCost.textContent = `$${formatUsd(payload.cost?.input_cost_usd ?? 0)}`;
@@ -236,6 +255,7 @@ async function onSend() {
       systemPrompt: body.system_prompt,
       message,
       answer: payload.answer || '',
+      llmMessages: Array.isArray(payload.llm_messages) ? payload.llm_messages : [],
       usage: payload.usage || {},
       cost: payload.cost || {},
       responseTimeMs,
@@ -258,10 +278,13 @@ async function onSend() {
     setStatus(error.message, true);
   } finally {
     toggleBusy(false);
+    setResponseLoading(false);
   }
 }
 
 function renderHistory() {
+  updateHistoryActionButtons();
+
   if (!state.history.length) {
     el.history.innerHTML = '<p>No saved runs yet.</p>';
     return;
@@ -359,6 +382,12 @@ function renderHistory() {
     .join('');
 }
 
+function updateHistoryActionButtons() {
+  const hasHistory = state.history.length > 0;
+  el.exportBtn.disabled = !hasHistory;
+  el.clearBtn.disabled = !hasHistory;
+}
+
 function loadHistory() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -366,6 +395,33 @@ function loadHistory() {
   } catch {
     return [];
   }
+}
+
+function loadUiPrefs() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(UI_PREFS_KEY) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+}
+
+function persistUiPrefs() {
+  localStorage.setItem(UI_PREFS_KEY, JSON.stringify(state.uiPrefs || {}));
+}
+
+function applyUiPreferences() {
+  if (typeof state.uiPrefs?.keepMessageAfterSend === 'boolean') {
+    el.keepMessageAfterSend.checked = state.uiPrefs.keepMessageAfterSend;
+  }
+  if (typeof state.uiPrefs?.includeConversationHistory === 'boolean') {
+    el.includeConversationHistory.checked = state.uiPrefs.includeConversationHistory;
+  }
+}
+
+function onKeepMessageAfterSendChange() {
+  state.uiPrefs.keepMessageAfterSend = Boolean(el.keepMessageAfterSend?.checked);
+  persistUiPrefs();
 }
 
 function buildHistoryContext() {
@@ -403,6 +459,16 @@ function clearHistory() {
   renderHistory();
   updateCompareBtn();
   setStatus('History cleared.');
+}
+
+function openClearConfirmModal() {
+  state.pendingDeleteEntryId = null;
+  openConfirmModal({
+    type: 'clearHistory',
+    title: 'Clear history',
+    message: 'Do you want to clear all history entries?',
+    actionLabel: 'Clear history',
+  });
 }
 
 function onHistoryClick(event) {
@@ -542,6 +608,11 @@ function toggleBusy(isBusy) {
   el.exportBtn.disabled = isBusy;
 }
 
+function setResponseLoading(isLoading) {
+  el.responseLoader.classList.toggle('hidden', !isLoading);
+  el.responseContent.classList.toggle('hidden', isLoading);
+}
+
 function setStatus(text, isError = false) {
   el.status.textContent = text;
   el.status.style.color = isError ? '#ff6b6b' : '#9fb0ce';
@@ -663,8 +734,8 @@ function onGlobalKeyDown(event) {
     closeHistoryDetailsModal();
     return;
   }
-  if (event.key === 'Escape' && !el.historyDeleteConfirmModal.classList.contains('hidden')) {
-    closeDeleteConfirmModal();
+  if (event.key === 'Escape' && !el.historyConfirmModal.classList.contains('hidden')) {
+    closeConfirmModal();
   }
 }
 
@@ -688,6 +759,7 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsTotalCost.textContent = `$${formatUsd(entry.cost?.total_cost_usd ?? 0)}`;
   el.historyDetailsSystemPrompt.value = entry.systemPrompt || '';
   el.historyDetailsMessage.value = entry.message || '';
+  el.historyDetailsLlmMessages.value = JSON.stringify(entry.llmMessages || [], null, 2);
   el.historyDetailsAnswer.value = entry.answer || '';
 
   setHistoryTab('stats');
@@ -698,35 +770,61 @@ function closeHistoryDetailsModal() {
   el.historyDetailsModal.classList.add('hidden');
 }
 
-function onDeleteModalClick(event) {
-  const closeTarget = event.target.closest('[data-close-delete-modal="true"]');
+function onConfirmModalClick(event) {
+  const closeTarget = event.target.closest('[data-close-confirm-modal="true"]');
   if (closeTarget) {
-    closeDeleteConfirmModal();
+    closeConfirmModal();
   }
 }
 
 function openDeleteConfirmModal(entryId) {
   state.pendingDeleteEntryId = entryId;
-  el.historyDeleteConfirmModal.classList.remove('hidden');
+  openConfirmModal({
+    type: 'deleteEntry',
+    title: 'Delete history entry',
+    message: 'Do you want to delete this history entry?',
+    actionLabel: 'Delete',
+  });
 }
 
-function closeDeleteConfirmModal() {
+function openConfirmModal({ type, title, message, actionLabel }) {
+  state.pendingConfirmAction = type;
+  el.historyConfirmTitle.textContent = title;
+  el.historyConfirmMessage.textContent = message;
+  el.historyConfirmActionBtn.textContent = actionLabel;
+  el.historyConfirmModal.classList.remove('hidden');
+}
+
+function closeConfirmModal() {
   state.pendingDeleteEntryId = null;
-  el.historyDeleteConfirmModal.classList.add('hidden');
+  state.pendingConfirmAction = null;
+  el.historyConfirmModal.classList.add('hidden');
+}
+
+function confirmModalAction() {
+  if (state.pendingConfirmAction === 'deleteEntry') {
+    confirmDeleteHistoryEntry();
+    return;
+  }
+  if (state.pendingConfirmAction === 'clearHistory') {
+    closeConfirmModal();
+    clearHistory();
+    return;
+  }
+  closeConfirmModal();
 }
 
 function confirmDeleteHistoryEntry() {
   if (!state.pendingDeleteEntryId) {
-    closeDeleteConfirmModal();
+    closeConfirmModal();
     return;
   }
-
   state.compareSelection.delete(state.pendingDeleteEntryId);
   state.history = state.history.filter((item) => item.id !== state.pendingDeleteEntryId);
   persistHistory();
   renderHistory();
   updateCompareBtn();
-  closeDeleteConfirmModal();
+  closeConfirmModal();
   setStatus('History entry deleted.');
 }
 
@@ -753,12 +851,8 @@ function setHistoryTab(tabName) {
 
 function updateCompareBtn() {
   const count = state.compareSelection.size;
-  const visible = count >= 2;
-  el.compareBtn.classList.toggle('hidden', !visible);
-  el.compareCount.classList.toggle('hidden', count === 0);
-  if (count > 0) {
-    el.compareCount.textContent = `${count}/${MAX_COMPARE} selected`;
-  }
+  el.compareBtn.disabled = count < 2;
+  el.compareBtn.innerHTML = `<i class="bi bi-bar-chart-line-fill me-2" aria-hidden="true"></i>Compare (${count}/${MAX_COMPARE})`;
 }
 
 function getCompareMetrics() {
