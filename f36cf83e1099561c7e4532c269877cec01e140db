@@ -1,0 +1,42 @@
+services/website/static/app.js
+  16316a587f4c252a 58-59,97,125,197,221,284,286,307-309,389,471,510,543,549,613,628,631-642,644,854,857-875
+  33bda3da9f5b944e 18,36,110,243,626-627
+services/website/index.html
+  16316a587f4c252a 89,95-109,187
+services/website/static/styles.css
+  16316a587f4c252a 176-180,219-229,231-232,583-592
+  33bda3da9f5b944e 190-194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "f36cf83e1099561c7e4532c269877cec01e140db",
+  "prompts": {
+    "16316a587f4c252a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "edf71449-b468-4b11-a6ba-0811b4060ad3",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 101,
+      "total_deletions": 35,
+      "accepted_lines": 100,
+      "overriden_lines": 0
+    },
+    "33bda3da9f5b944e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019c8b63-f61d-7cf1-904f-f3ca20325623",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 23,
+      "total_deletions": 1,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
