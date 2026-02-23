@@ -14,7 +14,7 @@
     />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body class="app-bg" data-bs-theme="dark">
+  <body class="app-bg">
     <main class="container-fluid px-3 px-md-4 py-3 py-md-4">
       <header class="mb-3 mb-md-4">
         <h1 class="fw-bold mb-1">AI Bench</h1>
@@ -25,31 +25,33 @@
         <aside class="col-12 col-xl-4">
           <section class="card shadow-sm border-0 sidebar-card">
             <div class="card-body p-3 p-md-4">
-              <div class="row g-3 mb-3">
-                <div class="col-12">
-                  <label class="form-label fw-semibold" for="provider">Provider</label>
-                  <select id="provider" class="form-select"></select>
-                </div>
+              <section class="control-group mb-3">
+                <div class="row g-3">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label fw-semibold" for="provider"><i class="bi bi-hdd-network label-icon" aria-hidden="true"></i>Provider</label>
+                    <select id="provider" class="form-select"></select>
+                  </div>
 
-                <div class="col-12" id="modelWrap">
-                  <label class="form-label fw-semibold" for="model">Model</label>
-                  <select id="model" class="form-select"></select>
-                </div>
+                  <div class="col-12 col-md-6" id="modelWrap">
+                    <label class="form-label fw-semibold" for="model"><i class="bi bi-cpu label-icon" aria-hidden="true"></i>Model</label>
+                    <select id="model" class="form-select"></select>
+                  </div>
 
-                <div class="col-12 hidden" id="deploymentWrap">
-                  <label class="form-label fw-semibold" for="deployment">Deployment</label>
-                  <select id="deployment" class="form-select"></select>
+                  <div class="col-12 col-md-6 hidden" id="deploymentWrap">
+                    <label class="form-label fw-semibold" for="deployment"><i class="bi bi-cloud label-icon" aria-hidden="true"></i>Deployment</label>
+                    <select id="deployment" class="form-select"></select>
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              <div class="mb-3">
-                <label class="form-label fw-semibold" for="systemPrompt">System Prompt</label>
+              <section class="control-group mb-3">
+                <label class="form-label fw-semibold" for="systemPrompt"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
                 <textarea id="systemPrompt" class="form-control" rows="6" placeholder="System instructions"></textarea>
-                <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+                <div class="d-flex flex-wrap align-items-center gap-1 mt-2 history-context-row">
                   <div class="form-check form-switch mb-0">
                     <input class="form-check-input" type="checkbox" id="includeConversationHistory" />
                   </div>
-                  <label class="text-body-secondary mb-0 d-flex align-items-center gap-2" for="includeConversationHistory">
+                  <label class="text-body-secondary mb-0 d-flex align-items-center gap-1 history-context-label" for="includeConversationHistory">
                     <span>Add last</span>
                     <input
                       id="historyMessageLimit"
@@ -61,27 +63,28 @@
                       style="width: 88px"
                       disabled
                     />
-                    <span>messages to chat context</span>
+                    <span>messages to context</span>
                   </label>
                 </div>
-              </div>
+              </section>
 
-              <div class="mb-3">
-                <label class="form-label fw-semibold" for="message">Message</label>
-                <div class="form-check form-switch mb-2">
-                  <input class="form-check-input" type="checkbox" id="keepMessageAfterSend" />
-                  <label class="form-check-label text-body-secondary" for="keepMessageAfterSend">
-                    keep message after send
-                  </label>
+              <section class="control-group">
+                <div class="mb-3">
+                  <label class="form-label fw-semibold" for="message"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+                  <div class="input-group message-input-group">
+                    <textarea id="message" class="form-control" rows="1" placeholder="User message"></textarea>
+                    <button id="sendBtn" class="btn btn-primary send-btn-inline" type="button">
+                      <i class="bi bi-send-fill me-2" aria-hidden="true"></i>Send
+                    </button>
+                  </div>
+                  <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="keepMessageAfterSend" />
+                    <label class="form-check-label text-body-secondary" for="keepMessageAfterSend">
+                      Keep message for next request
+                    </label>
+                  </div>
                 </div>
-                <textarea id="message" class="form-control" rows="1" placeholder="User message"></textarea>
-              </div>
-
-              <div class="actions d-grid gap-2">
-                <button id="sendBtn" class="btn btn-primary">
-                  <i class="bi bi-send-fill me-2" aria-hidden="true"></i>Send
-                </button>
-              </div>
+              </section>
 
               <p id="status" class="status text-body-secondary mb-0 mt-3"></p>
             </div>
@@ -118,20 +121,28 @@
                 </article>
                 <article class="usage-card usage-card-full">
                   <div class="d-flex align-items-center justify-content-between gap-3">
+                    <h3 class="usage-card-title mb-0">Time</h3>
+                    <div class="usage-inline-badges d-flex align-items-center gap-2">
+                      <span class="badge response-time-badge">Response: <strong id="responseTimeMs" class="ms-1">0 ms</strong></span>
+                    </div>
+                  </div>
+                </article>
+                <article class="usage-card usage-card-full">
+                  <div class="d-flex align-items-center justify-content-between gap-3">
+                    <h3 class="usage-card-title mb-0">Context</h3>
+                    <div class="usage-inline-badges d-flex align-items-center gap-2">
+                      <span class="badge response-token-badge">Messages included: <strong id="contextMessagesCount" class="ms-1">0</strong></span>
+                    </div>
+                  </div>
+                </article>
+                <article class="usage-card usage-card-full">
+                  <div class="d-flex align-items-center justify-content-between gap-3">
                     <h3 class="usage-card-title mb-0">Characters</h3>
                     <div class="usage-inline-badges d-flex align-items-center gap-2">
                     <span class="badge response-token-badge">System Prompt: <strong id="systemPromptChars" class="ms-1">0</strong></span>
                     <span class="badge response-cost-badge">Context: <strong id="contextChars" class="ms-1">0</strong></span>
                     <span class="badge response-cost-badge">Message: <strong id="messageChars" class="ms-1">0</strong></span>
                     <span class="badge response-time-badge">Output: <strong id="outputChars" class="ms-1">0</strong></span>
-                    </div>
-                  </div>
-                </article>
-                <article class="usage-card usage-card-full">
-                  <div class="d-flex align-items-center justify-content-between gap-3">
-                    <h3 class="usage-card-title mb-0">Time</h3>
-                    <div class="usage-inline-badges d-flex align-items-center gap-2">
-                      <span class="badge response-time-badge">Response: <strong id="responseTimeMs" class="ms-1">0 ms</strong></span>
                     </div>
                   </div>
                 </article>
@@ -142,16 +153,16 @@
           <section class="card shadow-sm border-0">
             <div class="card-body p-3 p-md-4">
               <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
-                <h2 class="h4 mb-0">Request/Response history</h2>
+                <h2 class="h4 mb-0">Request history</h2>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                   <span id="compareCount" class="text-body-secondary compare-count-label hidden"></span>
-                  <button id="compareBtn" class="btn btn-sm btn-outline-warning hidden">
+                  <button id="compareBtn" class="btn btn-sm btn-outline-secondary compare-btn hidden">
                     <i class="bi bi-bar-chart-line-fill me-2" aria-hidden="true"></i>Compare
                   </button>
-                  <button id="exportBtn" class="btn btn-sm btn-outline-primary">
+                  <button id="exportBtn" class="btn btn-sm btn-outline-primary export-btn">
                     <i class="bi bi-file-earmark-spreadsheet-fill me-2" aria-hidden="true"></i>Export CSV
                   </button>
-                  <button id="clearBtn" class="btn btn-sm btn-outline-danger">
+                  <button id="clearBtn" class="btn btn-sm btn-outline-danger clear-btn">
                     <i class="bi bi-trash3-fill me-2" aria-hidden="true"></i>Clear History
                   </button>
                 </div>
@@ -168,7 +179,7 @@
       <div class="history-modal-panel">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <h3 id="historyDetailsTitle" class="h5 mb-0">History Details</h3>
-          <button id="historyDetailsCloseBtn" class="btn btn-sm btn-outline-light" type="button" aria-label="Close details">
+          <button id="historyDetailsCloseBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-label="Close details">
             <i class="bi bi-x-lg" aria-hidden="true"></i>
           </button>
         </div>
@@ -247,7 +258,7 @@
       <div class="history-modal-panel">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <h3 id="historyDeleteConfirmTitle" class="h5 mb-0">Delete history entry</h3>
-          <button id="historyDeleteCloseBtn" class="btn btn-sm btn-outline-light" type="button" aria-label="Close delete confirmation">
+          <button id="historyDeleteCloseBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-label="Close delete confirmation">
             <i class="bi bi-x-lg" aria-hidden="true"></i>
           </button>
         </div>
@@ -264,7 +275,7 @@
       <div class="history-modal-panel compare-modal-panel">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <h3 id="compareModalTitle" class="h5 mb-0">Compare runs</h3>
-          <button id="compareCloseBtn" class="btn btn-sm btn-outline-light" type="button" aria-label="Close compare">
+          <button id="compareCloseBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-label="Close compare">
             <i class="bi bi-x-lg" aria-hidden="true"></i>
           </button>
         </div>

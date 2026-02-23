@@ -37,6 +37,7 @@ const el = {
   totalTokens: document.getElementById('totalTokens'),
   totalCost: document.getElementById('totalCost'),
   responseTimeMs: document.getElementById('responseTimeMs'),
+  contextMessagesCount: document.getElementById('contextMessagesCount'),
   systemPromptChars: document.getElementById('systemPromptChars'),
   contextChars: document.getElementById('contextChars'),
   messageChars: document.getElementById('messageChars'),
@@ -224,6 +225,7 @@ async function onSend() {
     el.contextChars.textContent = String(contextChars);
     el.messageChars.textContent = String(messageChars);
     el.outputChars.textContent = String(outputChars);
+    el.contextMessagesCount.textContent = String(historyContext.contextMessagesCount);
 
     const historyEntry = {
       id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -293,10 +295,26 @@ function renderHistory() {
             <input class="form-check-input history-compare-cb ms-1" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''} title="Select for comparison (max ${MAX_COMPARE})" aria-label="Select run for comparison">
           </div>
         </div>
-        <div><strong>System:</strong> ${escapeHtml(shorten(item.systemPrompt, 220))}</div>
-        <div><strong>Message:</strong> ${escapeHtml(shorten(item.message, 220))}</div>
-        <div><strong>Answer:</strong> ${escapeHtml(shorten(item.answer, 220))}</div>
-        <div class="meta mt-1">Messages included into context: ${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</div>
+        <div class="history-preview-grid mt-2">
+          <div class="history-preview-field">
+            <label class="form-label fw-semibold mb-1"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+            <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.message || '')}</textarea>
+          </div>
+          <div class="history-preview-field">
+            <label class="form-label fw-semibold mb-1"><i class="bi bi-reply-fill label-icon" aria-hidden="true"></i>Response</label>
+            <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.answer || '')}</textarea>
+          </div>
+          <div class="history-preview-field">
+            <label class="form-label fw-semibold mb-1"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
+            <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.systemPrompt || '')}</textarea>
+          </div>
+        </div>
+        <div class="usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
+          <h4 class="usage-card-title mb-0">Context</h4>
+          <div class="usage-inline-badges d-flex align-items-center gap-2">
+            <span class="badge response-token-badge">Messages included: <strong class="ms-1">${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</strong></span>
+          </div>
+        </div>
         <div class="history-chars-row usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
           <h4 class="usage-card-title mb-0">Characters</h4>
           <div class="usage-inline-badges d-flex align-items-center gap-2">
