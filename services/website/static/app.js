@@ -2,6 +2,8 @@ const STORAGE_KEY = 'aibench_history_v1';
 const UI_PREFS_KEY = 'aibench_ui_prefs_v1';
 const STORAGE_KEYS = {
   llmProvider: 'llm_provider',
+  llmModel: 'llm_model',
+  llmDeployment: 'llm_deployment',
   openaiApiKey: 'openai_api_key',
   azureApiKey: 'azure_api_key',
 };
@@ -157,6 +159,8 @@ async function init() {
   renderHistory();
 
   el.provider.addEventListener('change', onProviderChange);
+  el.model.addEventListener('change', () => localStorage.setItem(STORAGE_KEYS.llmModel, el.model.value));
+  el.deployment.addEventListener('change', () => localStorage.setItem(STORAGE_KEYS.llmDeployment, el.deployment.value));
   el.message.addEventListener('input', resizeMessageInput);
   el.includeConversationHistory.addEventListener('change', onHistoryToggleChange);
   el.keepMessageAfterSend.addEventListener('change', onKeepMessageAfterSendChange);
@@ -241,6 +245,10 @@ function onProviderChange() {
         .map((m) => `<option value="${m.id}">${m.label || m.id}</option>`)
         .join('');
       el.model.disabled = false;
+      const savedModel = localStorage.getItem(STORAGE_KEYS.llmModel);
+      if (savedModel && enabledModels.some((m) => m.id === savedModel)) {
+        el.model.value = savedModel;
+      }
     }
   } else {
     el.modelWrap.classList.add('hidden');
@@ -254,6 +262,10 @@ function onProviderChange() {
         .map((d) => `<option value="${d.name}">${d.label || d.name}</option>`)
         .join('');
       el.deployment.disabled = false;
+      const savedDeployment = localStorage.getItem(STORAGE_KEYS.llmDeployment);
+      if (savedDeployment && enabledDeployments.some((d) => d.name === savedDeployment)) {
+        el.deployment.value = savedDeployment;
+      }
     }
   }
 

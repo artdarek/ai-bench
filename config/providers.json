@@ -21,13 +21,13 @@
       "label": "OpenAI",
       "models": [
         {
-          "id": "gpt-5-mini",
-          "label": "gpt-5-mini",
+          "id": "gpt-5-nano",
+          "label": "gpt-5-nano",
           "enabled": true
         },
         {
-          "id": "gpt-5-nano",
-          "label": "gpt-5-nano",
+          "id": "gpt-5-mini",
+          "label": "gpt-5-mini",
           "enabled": true
         }
       ],
