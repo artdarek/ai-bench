@@ -94,6 +94,7 @@ const el = {
   historyConfirmCloseBtn: document.getElementById('historyConfirmCloseBtn'),
   historyConfirmCancelBtn: document.getElementById('historyConfirmCancelBtn'),
   historyConfirmActionBtn: document.getElementById('historyConfirmActionBtn'),
+  historyViewToggleBtn: document.getElementById('historyViewToggleBtn'),
   compareBtn: document.getElementById('compareBtn'),
   compareModal: document.getElementById('compareModal'),
   compareCloseBtn: document.getElementById('compareCloseBtn'),
@@ -129,6 +130,7 @@ async function init() {
   setupProviderOptions();
   applyDefaultPrompts();
   applyUiPreferences();
+  applyHistoryView();
   setResponseHasData(false);
   setResponseLoading(false);
   renderHistory();
@@ -144,6 +146,7 @@ async function init() {
   el.historyConfirmCloseBtn.addEventListener('click', closeConfirmModal);
   el.historyConfirmCancelBtn.addEventListener('click', closeConfirmModal);
   el.historyConfirmActionBtn.addEventListener('click', confirmModalAction);
+  el.historyViewToggleBtn.addEventListener('click', toggleHistoryView);
   el.mainTabButtons.forEach((button) => button.addEventListener('click', onMainTabClick));
   el.historyTabButtons.forEach((button) => button.addEventListener('click', onHistoryTabClick));
   el.chartSelect.addEventListener('change', renderChart);
@@ -372,7 +375,7 @@ function renderHistory() {
             <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.systemPrompt || '')}</textarea>
           </div>
         </div>
-        <div class="usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
+        <div class="history-context-card usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
           <h4 class="usage-card-title mb-0">Context</h4>
           <div class="usage-inline-badges d-flex align-items-center gap-2">
             <span class="badge response-token-badge">Messages included: <strong class="ms-1">${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</strong></span>
@@ -388,7 +391,7 @@ function renderHistory() {
             <span class="badge response-time-badge">Output: <strong class="ms-1">${item.outputChars ?? countChars(item.answer || '')}</strong></span>
           </div>
         </div>
-        <div class="usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
+        <div class="history-time-card usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
           <h4 class="usage-card-title mb-0">Time</h4>
           <div class="usage-inline-badges d-flex align-items-center gap-2">
             <span class="badge response-time-badge">Response: <strong class="ms-1">${formatResponseTimeMs(item.responseTimeMs)}</strong></span>
@@ -464,6 +467,25 @@ function applyUiPreferences() {
 function onKeepMessageAfterSendChange() {
   state.uiPrefs.keepMessageAfterSend = Boolean(el.keepMessageAfterSend?.checked);
   persistUiPrefs();
+}
+
+function toggleHistoryView() {
+  state.uiPrefs.historyCompact = !(state.uiPrefs.historyCompact !== false);
+  persistUiPrefs();
+  applyHistoryView();
+}
+
+function applyHistoryView() {
+  const compact = state.uiPrefs.historyCompact !== false;
+  el.history.classList.toggle('history-compact', compact);
+  const icon = el.historyViewToggleBtn.querySelector('i');
+  if (compact) {
+    icon.className = 'bi bi-card-list';
+    el.historyViewToggleBtn.title = 'Switch to detailed view';
+  } else {
+    icon.className = 'bi bi-list-ul';
+    el.historyViewToggleBtn.title = 'Switch to compact view';
+  }
 }
 
 function buildHistoryContext() {

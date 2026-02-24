@@ -595,6 +595,13 @@
   max-width: 280px;
 }
 
+/* History compact view */
+.history-compact .history-context-card,
+.history-compact .history-chars-row,
+.history-compact .history-time-card {
+  display: none !important;
+}
+
 .chart-canvas-wrap {
   border: 1px solid var(--border);
   border-radius: 0.6rem;
