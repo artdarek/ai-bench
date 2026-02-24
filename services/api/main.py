@@ -148,6 +148,11 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
             if not payload.model:
                 raise HTTPException(status_code=400, detail='Model is required for OpenAI.')
 
+            models = provider_cfg.get('models', [])
+            model_cfg = next((m for m in models if m.get('id') == payload.model), None)
+            if model_cfg and not model_cfg.get('enabled', True):
+                raise HTTPException(status_code=400, detail='Model is disabled.')
+
             api_key = (payload.api_key or '').strip() or os.getenv('OPENAI_API_KEY', '').strip()
             if not api_key:
                 raise HTTPException(status_code=500, detail='Missing OPENAI_API_KEY.')
@@ -171,6 +176,8 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
             deployment_cfg = next((d for d in deployments if d.get('name') == payload.deployment), None)
             if not deployment_cfg:
                 raise HTTPException(status_code=400, detail='Unknown Azure deployment.')
+            if not deployment_cfg.get('enabled', True):
+                raise HTTPException(status_code=400, detail='Deployment is disabled.')
 
             model_name = str(deployment_cfg.get('model', '')).strip() or payload.deployment
             client = AzureOpenAI(api_key=api_key, azure_endpoint=endpoint, api_version=api_version)

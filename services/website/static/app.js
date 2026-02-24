@@ -232,15 +232,29 @@ function onProviderChange() {
   if (provider === 'openai') {
     el.modelWrap.classList.remove('hidden');
     el.deploymentWrap.classList.add('hidden');
-    el.model.innerHTML = (providerCfg.models || [])
-      .map((m) => `<option value="${m.id}">${m.label || m.id}</option>`)
-      .join('');
+    const enabledModels = (providerCfg.models || []).filter((m) => m.enabled !== false);
+    if (enabledModels.length === 0) {
+      el.model.innerHTML = '<option value="">No models available</option>';
+      el.model.disabled = true;
+    } else {
+      el.model.innerHTML = enabledModels
+        .map((m) => `<option value="${m.id}">${m.label || m.id}</option>`)
+        .join('');
+      el.model.disabled = false;
+    }
   } else {
     el.modelWrap.classList.add('hidden');
     el.deploymentWrap.classList.remove('hidden');
-    el.deployment.innerHTML = (providerCfg.deployments || [])
-      .map((d) => `<option value="${d.name}">${d.label || d.name}</option>`)
-      .join('');
+    const enabledDeployments = (providerCfg.deployments || []).filter((d) => d.enabled !== false);
+    if (enabledDeployments.length === 0) {
+      el.deployment.innerHTML = '<option value="">No models available</option>';
+      el.deployment.disabled = true;
+    } else {
+      el.deployment.innerHTML = enabledDeployments
+        .map((d) => `<option value="${d.name}">${d.label || d.name}</option>`)
+        .join('');
+      el.deployment.disabled = false;
+    }
   }
 
   // Keep user drafts untouched when switching provider/model/deployment.
