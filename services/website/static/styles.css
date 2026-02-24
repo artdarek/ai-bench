@@ -18,6 +18,59 @@
   color: var(--text);
 }
 
+.header-right {
+  margin-top: 0.1rem;
+}
+
+.btn-icon {
+  position: relative;
+  background: #fff;
+  border: 1px solid #d5dce4;
+  color: #5f6c7b;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-icon:hover {
+  background: #f2f5f8;
+  border-color: #c2ccd8;
+  color: #405062;
+}
+
+.btn-icon .bi {
+  line-height: 1;
+}
+
+.btn-icon-clear:hover {
+  background: #fdecec;
+  border-color: #e6aaaa;
+  color: #9d2323;
+}
+
+.key-indicator {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  background: #9aa7b5;
+}
+
+.key-indicator.set {
+  background: #1f7a39;
+}
+
+.key-indicator.missing {
+  background: #b42323;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border) !important;
@@ -325,6 +378,10 @@
 
 .confirm-modal-panel {
   width: min(450px, 100%);
+}
+
+.settings-modal-panel {
+  width: min(560px, 100%);
 }
 
 .history-details-modal-panel {

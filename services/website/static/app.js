@@ -1,5 +1,10 @@
 const STORAGE_KEY = 'aibench_history_v1';
 const UI_PREFS_KEY = 'aibench_ui_prefs_v1';
+const STORAGE_KEYS = {
+  llmProvider: 'llm_provider',
+  openaiApiKey: 'openai_api_key',
+  azureApiKey: 'azure_api_key',
+};
 const MAX_HISTORY = 300;
 const DEFAULT_SYSTEM_PROMPT =
   'You are a friendly and polite assistant. Be warm, helpful, and concise in your responses.';
@@ -34,6 +39,10 @@ const el = {
   message: document.getElementById('message'),
   keepMessageAfterSend: document.getElementById('keepMessageAfterSend'),
   sendBtn: document.getElementById('sendBtn'),
+  headerExportBtn: document.getElementById('headerExportBtn'),
+  headerClearBtn: document.getElementById('headerClearBtn'),
+  headerSettingsBtn: document.getElementById('headerSettingsBtn'),
+  headerKeyIndicator: document.getElementById('headerKeyIndicator'),
   exportBtn: document.getElementById('exportBtn'),
   clearBtn: document.getElementById('clearBtn'),
   status: document.getElementById('status'),
@@ -101,6 +110,18 @@ const el = {
   compareTableHead: document.getElementById('compareTableHead'),
   compareTableBody: document.getElementById('compareTableBody'),
   compareExportBtn: document.getElementById('compareExportBtn'),
+  settingsModal: document.getElementById('settingsModal'),
+  settingsModalCloseBtn: document.getElementById('settingsModalCloseBtn'),
+  settingsModalDesc: document.getElementById('settingsModalDesc'),
+  settingsProvider: document.getElementById('settingsProvider'),
+  settingsApiKey: document.getElementById('settingsApiKey'),
+  settingsProviderHint: document.getElementById('settingsProviderHint'),
+  settingsToggleApiKeyBtn: document.getElementById('settingsToggleApiKeyBtn'),
+  settingsEyeShow: document.getElementById('settingsEyeShow'),
+  settingsEyeHide: document.getElementById('settingsEyeHide'),
+  settingsRemoveKeyBtn: document.getElementById('settingsRemoveKeyBtn'),
+  settingsCancelBtn: document.getElementById('settingsCancelBtn'),
+  settingsSaveBtn: document.getElementById('settingsSaveBtn'),
   chartSelect: document.getElementById('chartSelect'),
   mainChart: document.getElementById('mainChart'),
   mainChart2: document.getElementById('mainChart2'),
@@ -156,10 +177,23 @@ async function init() {
   el.compareExportBtn.addEventListener('click', exportCompareCsv);
   document.addEventListener('keydown', onGlobalKeyDown);
   el.sendBtn.addEventListener('click', onSend);
+  el.headerExportBtn.addEventListener('click', exportCsv);
+  el.headerClearBtn.addEventListener('click', openClearConfirmModal);
+  el.headerSettingsBtn.addEventListener('click', openSettingsModal);
   el.exportBtn.addEventListener('click', exportCsv);
   el.clearBtn.addEventListener('click', openClearConfirmModal);
+  el.settingsModal.addEventListener('click', onSettingsModalClick);
+  el.settingsModalCloseBtn.addEventListener('click', closeSettingsModal);
+  el.settingsCancelBtn.addEventListener('click', closeSettingsModal);
+  el.settingsProvider.addEventListener('change', onSettingsProviderChange);
+  el.settingsSaveBtn.addEventListener('click', saveSettingsModal);
+  el.settingsRemoveKeyBtn.addEventListener('click', removeSettingsProviderKey);
+  el.settingsToggleApiKeyBtn.addEventListener('click', toggleSettingsApiKeyVisibility);
+  el.settingsApiKey.addEventListener('keydown', onSettingsApiKeyKeyDown);
   onHistoryToggleChange();
   resizeMessageInput();
+  updateSettingsModalState();
+  updateKeyIndicator();
 }
 
 function setupProviderOptions() {
@@ -168,6 +202,11 @@ function setupProviderOptions() {
     .map(([key, provider]) => `<option value="${key}">${provider.label || key}</option>`)
     .join('');
 
+  const preferredProvider = localStorage.getItem(STORAGE_KEYS.llmProvider);
+  const hasPreferred = providers.some(([key]) => key === preferredProvider);
+  if (hasPreferred) {
+    el.provider.value = preferredProvider;
+  }
   onProviderChange();
 }
 
@@ -208,6 +247,12 @@ function onProviderChange() {
   el.systemPrompt.value = draftSystemPrompt;
   el.message.value = draftMessage;
   resizeMessageInput();
+  localStorage.setItem(STORAGE_KEYS.llmProvider, provider);
+  if (el.settingsProvider.value !== provider) {
+    el.settingsProvider.value = provider;
+    updateSettingsModalState();
+  }
+  updateKeyIndicator();
 }
 
 function onHistoryToggleChange() {
@@ -215,6 +260,126 @@ function onHistoryToggleChange() {
   el.historyMessageLimit.disabled = !enabled;
   state.uiPrefs.includeConversationHistory = enabled;
   persistUiPrefs();
+}
+
+function getProviderStorageKey(provider) {
+  if (provider === 'azure') {
+    return STORAGE_KEYS.azureApiKey;
+  }
+  return STORAGE_KEYS.openaiApiKey;
+}
+
+function getSavedProviderKey(provider) {
+  const storageKey = getProviderStorageKey(provider);
+  return localStorage.getItem(storageKey) || '';
+}
+
+function providerHasServerKey(provider) {
+  const value = state.config?.providers?.[provider]?.server_key;
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  return null;
+}
+
+function hasEffectiveKey(provider) {
+  const serverKeyStatus = providerHasServerKey(provider);
+  return Boolean(getSavedProviderKey(provider) || serverKeyStatus === true);
+}
+
+function updateKeyIndicator() {
+  const provider = el.provider.value || 'openai';
+  const hasKey = hasEffectiveKey(provider);
+  el.headerKeyIndicator.className = `key-indicator ${hasKey ? 'set' : 'missing'}`;
+}
+
+function updateSettingsModalState() {
+  const provider = el.settingsProvider.value || 'openai';
+  const savedKey = getSavedProviderKey(provider);
+  const providerLabel = state.config?.providers?.[provider]?.label || provider;
+  const serverKeyStatus = providerHasServerKey(provider);
+  el.settingsApiKey.value = savedKey;
+  el.settingsApiKey.type = 'password';
+  el.settingsEyeShow.classList.remove('hidden');
+  el.settingsEyeHide.classList.add('hidden');
+  el.settingsRemoveKeyBtn.classList.toggle('hidden', !savedKey);
+  if (serverKeyStatus === true) {
+    el.settingsModalDesc.textContent =
+      'This provider has a server-side key configured. You can optionally override it with your own key, stored in this browser.';
+  } else if (serverKeyStatus === false) {
+    el.settingsModalDesc.textContent =
+      'No server-side key is configured for this provider. Add your own key to connect.';
+  } else {
+    el.settingsModalDesc.textContent =
+      'Server-side key status is unavailable in current API response. Restart API service to refresh settings metadata.';
+  }
+  el.settingsProviderHint.textContent = `Runtime status: supported (${providerLabel}).`;
+
+  if (provider === 'azure') {
+    el.settingsApiKey.placeholder = 'azure-api-key...';
+  } else {
+    el.settingsApiKey.placeholder = 'sk-...';
+  }
+}
+
+function openSettingsModal() {
+  el.settingsProvider.value = el.provider.value || 'openai';
+  updateSettingsModalState();
+  el.settingsModal.classList.remove('hidden');
+  setTimeout(() => el.settingsApiKey.focus(), 50);
+}
+
+function closeSettingsModal() {
+  el.settingsModal.classList.add('hidden');
+}
+
+function onSettingsProviderChange() {
+  updateSettingsModalState();
+}
+
+function saveSettingsModal() {
+  const provider = el.settingsProvider.value || 'openai';
+  const storageKey = getProviderStorageKey(provider);
+  const value = el.settingsApiKey.value.trim();
+  if (value) {
+    localStorage.setItem(storageKey, value);
+  } else {
+    localStorage.removeItem(storageKey);
+  }
+  localStorage.setItem(STORAGE_KEYS.llmProvider, provider);
+  el.provider.value = provider;
+  onProviderChange();
+  updateSettingsModalState();
+  updateKeyIndicator();
+  closeSettingsModal();
+  setStatus('Settings saved.', 'success');
+}
+
+function removeSettingsProviderKey() {
+  const provider = el.settingsProvider.value || 'openai';
+  localStorage.removeItem(getProviderStorageKey(provider));
+  updateSettingsModalState();
+  updateKeyIndicator();
+}
+
+function toggleSettingsApiKeyVisibility() {
+  const isPassword = el.settingsApiKey.type === 'password';
+  el.settingsApiKey.type = isPassword ? 'text' : 'password';
+  el.settingsEyeShow.classList.toggle('hidden', isPassword);
+  el.settingsEyeHide.classList.toggle('hidden', !isPassword);
+}
+
+function onSettingsApiKeyKeyDown(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    saveSettingsModal();
+  }
+}
+
+function onSettingsModalClick(event) {
+  if (event.target.closest('[data-close-settings-modal="true"]')) {
+    closeSettingsModal();
+  }
 }
 
 async function onSend() {
@@ -240,6 +405,10 @@ async function onSend() {
     body.model = el.model.value;
   } else {
     body.deployment = el.deployment.value;
+  }
+  const customApiKey = getSavedProviderKey(provider);
+  if (customApiKey) {
+    body.api_key = customApiKey;
   }
 
   toggleBusy(true);
@@ -431,6 +600,8 @@ function updateHistoryActionButtons() {
   const hasHistory = state.history.length > 0;
   el.exportBtn.disabled = !hasHistory;
   el.clearBtn.disabled = !hasHistory;
+  el.headerExportBtn.disabled = !hasHistory;
+  el.headerClearBtn.disabled = !hasHistory;
 }
 
 function loadHistory() {
@@ -670,6 +841,9 @@ function exportCsv() {
 function toggleBusy(isBusy) {
   el.sendBtn.disabled = isBusy;
   el.exportBtn.disabled = isBusy;
+  el.headerExportBtn.disabled = isBusy || !state.history.length;
+  el.headerClearBtn.disabled = isBusy || !state.history.length;
+  el.headerSettingsBtn.disabled = isBusy;
 }
 
 function setResponseLoading(isLoading) {
@@ -806,6 +980,10 @@ function onModalClick(event) {
 }
 
 function onGlobalKeyDown(event) {
+  if (event.key === 'Escape' && !el.settingsModal.classList.contains('hidden')) {
+    closeSettingsModal();
+    return;
+  }
   if (event.key === 'Escape' && !el.compareModal.classList.contains('hidden')) {
     closeCompareModal();
     return;

@@ -27,6 +27,7 @@ class ChatRequest(BaseModel):
     provider: str = Field(pattern='^(openai|azure)$')
     model: str | None = None
     deployment: str | None = None
+    api_key: str | None = None
     system_prompt: str = Field(default='')
     message: str = Field(min_length=1)
     history_messages: list[dict[str, str]] = Field(default_factory=list)
@@ -117,7 +118,13 @@ def normalize_azure_endpoint(raw_endpoint: str) -> str:
 
 @app.get('/api/config')
 def get_config() -> dict[str, Any]:
-    return load_provider_config()
+    cfg = load_provider_config()
+    providers = cfg.get('providers', {})
+    if isinstance(providers.get('openai'), dict):
+        providers['openai']['server_key'] = bool(os.getenv('OPENAI_API_KEY', '').strip())
+    if isinstance(providers.get('azure'), dict):
+        providers['azure']['server_key'] = bool(os.getenv('AZURE_OPENAI_API_KEY', '').strip())
+    return cfg
 
 
 @app.post('/api/chat')
@@ -141,7 +148,7 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
             if not payload.model:
                 raise HTTPException(status_code=400, detail='Model is required for OpenAI.')
 
-            api_key = os.getenv('OPENAI_API_KEY', '').strip()
+            api_key = (payload.api_key or '').strip() or os.getenv('OPENAI_API_KEY', '').strip()
             if not api_key:
                 raise HTTPException(status_code=500, detail='Missing OPENAI_API_KEY.')
 
@@ -154,7 +161,7 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
                 raise HTTPException(status_code=400, detail='Deployment is required for Azure.')
 
             endpoint = normalize_azure_endpoint(os.getenv('AZURE_OPENAI_ENDPOINT', ''))
-            api_key = os.getenv('AZURE_OPENAI_API_KEY', '').strip()
+            api_key = (payload.api_key or '').strip() or os.getenv('AZURE_OPENAI_API_KEY', '').strip()
             api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2024-10-21').strip()
 
             if not endpoint or not api_key:

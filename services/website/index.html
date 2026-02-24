@@ -17,8 +17,24 @@
   <body class="app-bg">
     <main class="container-fluid px-3 px-md-4 py-3 py-md-4">
       <header class="mb-3 mb-md-4">
-        <h1 class="fw-bold mb-1">AI Bench</h1>
-        <p class="text-body-secondary mb-0">Prompt testing, model comparison, and cost tracking (Chat Completions).</p>
+        <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+          <div>
+            <h1 class="fw-bold mb-1">AI Bench</h1>
+            <p class="text-body-secondary mb-0">Prompt testing, model comparison, and cost tracking (Chat Completions).</p>
+          </div>
+          <div class="header-right d-flex align-items-center gap-2">
+            <button id="headerExportBtn" class="btn-icon" aria-label="Export history" title="Export history as CSV" type="button">
+              <i class="bi bi-download" aria-hidden="true"></i>
+            </button>
+            <button id="headerClearBtn" class="btn-icon btn-icon-clear" aria-label="Clear history" title="Clear history" type="button">
+              <i class="bi bi-trash3" aria-hidden="true"></i>
+            </button>
+            <button id="headerSettingsBtn" class="btn-icon" aria-label="API key settings" title="Configure API keys" type="button">
+              <i class="bi bi-gear" aria-hidden="true"></i>
+              <span class="key-indicator" id="headerKeyIndicator" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
       </header>
 
       <div class="row g-3 g-xl-4 align-items-start">
@@ -260,6 +276,51 @@
         </section>
       </div>
     </main>
+
+    <div id="settingsModal" class="history-modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+      <div class="history-modal-backdrop" data-close-settings-modal="true"></div>
+      <div class="history-modal-panel settings-modal-panel">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h3 id="settingsModalTitle" class="h5 mb-0">LLM Settings</h3>
+          <button id="settingsModalCloseBtn" class="btn btn-sm btn-outline-secondary" type="button" aria-label="Close settings">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </button>
+        </div>
+        <p id="settingsModalDesc" class="text-body-secondary mb-3">
+          API keys are saved in this browser (`localStorage`) and override server keys for requests from this browser.
+        </p>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="settingsProvider">Provider</label>
+          <select id="settingsProvider" class="form-select">
+            <option value="openai">OpenAI</option>
+            <option value="azure">Azure OpenAI</option>
+          </select>
+          <p id="settingsProviderHint" class="text-body-secondary small mb-0 mt-2"></p>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label fw-semibold" for="settingsApiKey">API Key</label>
+          <div class="input-group">
+            <input id="settingsApiKey" type="password" class="form-control" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+            <button id="settingsToggleApiKeyBtn" class="btn btn-outline-secondary" type="button" aria-label="Toggle key visibility">
+              <i id="settingsEyeShow" class="bi bi-eye" aria-hidden="true"></i>
+              <i id="settingsEyeHide" class="bi bi-eye-slash hidden" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center gap-2">
+          <button id="settingsRemoveKeyBtn" class="btn btn-sm btn-outline-danger hidden" type="button">
+            Remove key
+          </button>
+          <div class="d-flex justify-content-end gap-2 ms-auto">
+            <button id="settingsCancelBtn" class="btn btn-sm btn-outline-secondary" type="button">Cancel</button>
+            <button id="settingsSaveBtn" class="btn btn-sm btn-primary" type="button">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div id="historyDetailsModal" class="history-modal hidden" role="dialog" aria-modal="true" aria-labelledby="historyDetailsTitle">
       <div class="history-modal-backdrop" data-close-modal="true"></div>
