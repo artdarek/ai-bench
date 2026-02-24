@@ -1,0 +1,25 @@
+services/website/static/app.js
+  be2e62378c2d4a3b 97,1052-1111,1366-1367
+services/website/index.html
+  be2e62378c2d4a3b 409-413,415-419,424-426,431-433,437-438
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "b6a9c4a7e48158b4768b17af18b3b5aeaadfd593",
+  "prompts": {
+    "be2e62378c2d4a3b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7a70da7e-7c3f-4838-a6cb-d6e6859d84f9",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 103,
+      "total_deletions": 32,
+      "accepted_lines": 82,
+      "overriden_lines": 0
+    }
+  }
+}
