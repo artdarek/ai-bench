@@ -19,6 +19,7 @@ const state = {
   chartInstance: null,
   chartInstance2: null,
   chartInstance3: null,
+  chartInstance4: null,
 };
 
 const el = {
@@ -43,6 +44,8 @@ const el = {
   responseMessagePreview: document.getElementById('responseMessagePreview'),
   responseSystemPromptPreview: document.getElementById('responseSystemPromptPreview'),
   responseRawMessagePreview: document.getElementById('responseRawMessagePreview'),
+  responseRawOutputPreview: document.getElementById('responseRawOutputPreview'),
+  rawJsonChars: document.getElementById('rawJsonChars'),
   inputTokens: document.getElementById('inputTokens'),
   outputTokens: document.getElementById('outputTokens'),
   inputCost: document.getElementById('inputCost'),
@@ -73,6 +76,7 @@ const el = {
   historyDetailsContextChars: document.getElementById('historyDetailsContextChars'),
   historyDetailsMessageChars: document.getElementById('historyDetailsMessageChars'),
   historyDetailsOutputChars: document.getElementById('historyDetailsOutputChars'),
+  historyDetailsRawJsonChars: document.getElementById('historyDetailsRawJsonChars'),
   historyDetailsInputTokens: document.getElementById('historyDetailsInputTokens'),
   historyDetailsOutputTokens: document.getElementById('historyDetailsOutputTokens'),
   historyDetailsTotalTokens: document.getElementById('historyDetailsTotalTokens'),
@@ -82,6 +86,7 @@ const el = {
   historyDetailsSystemPrompt: document.getElementById('historyDetailsSystemPrompt'),
   historyDetailsMessage: document.getElementById('historyDetailsMessage'),
   historyDetailsLlmMessages: document.getElementById('historyDetailsLlmMessages'),
+  historyDetailsLlmResponse: document.getElementById('historyDetailsLlmResponse'),
   historyDetailsAnswer: document.getElementById('historyDetailsAnswer'),
   historyConfirmModal: document.getElementById('historyConfirmModal'),
   historyConfirmTitle: document.getElementById('historyConfirmTitle'),
@@ -99,10 +104,16 @@ const el = {
   mainChart: document.getElementById('mainChart'),
   mainChart2: document.getElementById('mainChart2'),
   mainChart3: document.getElementById('mainChart3'),
+  mainChart4: document.getElementById('mainChart4'),
+  chartLabel: document.getElementById('chartLabel'),
+  chartLabel2: document.getElementById('chartLabel2'),
+  chartLabel3: document.getElementById('chartLabel3'),
+  chartLabel4: document.getElementById('chartLabel4'),
   chartsEmpty: document.getElementById('chartsEmpty'),
   chartsWrap: document.getElementById('chartsWrap'),
   chartsWrap2: document.getElementById('chartsWrap2'),
   chartsWrap3: document.getElementById('chartsWrap3'),
+  chartsWrap4: document.getElementById('chartsWrap4'),
 };
 
 init().catch((error) => setStatus(`Initialization error: ${error.message}`, 'error'));
@@ -250,7 +261,12 @@ async function onSend() {
 
     el.responseMessagePreview.value = body.message || '';
     el.responseSystemPromptPreview.value = body.system_prompt || '';
-    el.responseRawMessagePreview.value = JSON.stringify(payload.llm_messages || [], null, 2);
+    const rawJson = JSON.stringify(payload.llm_messages || [], null, 2);
+    const rawJsonChars = rawJson.length;
+    const rawOutputJson = JSON.stringify(payload.llm_response || {}, null, 2);
+    el.responseRawMessagePreview.value = rawJson;
+    el.responseRawOutputPreview.value = rawOutputJson;
+    el.rawJsonChars.textContent = String(rawJsonChars);
     el.answer.value = payload.answer || '';
     setResponseHasData(true);
     el.inputTokens.textContent = String(payload.usage?.input_tokens ?? 0);
@@ -276,6 +292,7 @@ async function onSend() {
       message,
       answer: payload.answer || '',
       llmMessages: Array.isArray(payload.llm_messages) ? payload.llm_messages : [],
+      llmResponse: payload.llm_response || {},
       usage: payload.usage || {},
       cost: payload.cost || {},
       responseTimeMs,
@@ -284,6 +301,7 @@ async function onSend() {
       contextChars,
       messageChars,
       outputChars,
+      rawJsonChars,
     };
 
     state.history = [...state.history, historyEntry].slice(-MAX_HISTORY);
@@ -324,6 +342,7 @@ function renderHistory() {
             <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
             <span>${formatHistoryDate(item.createdAt)}</span>
             <span class="dot-sep">•</span>
+            <span class="badge text-bg-secondary">${item.id}</span>
             <span class="badge text-bg-secondary">${item.provider}</span>
             <span class="badge text-bg-secondary">${item.deployment || item.model}</span>
           </div>
@@ -365,6 +384,7 @@ function renderHistory() {
             <span class="badge response-token-badge">System: <strong class="ms-1">${getSystemPromptChars(item)}</strong></span>
             <span class="badge response-cost-badge">Context: <strong class="ms-1">${getContextChars(item)}</strong></span>
             <span class="badge response-cost-badge">Message: <strong class="ms-1">${item.messageChars ?? countChars(item.message || '')}</strong></span>
+            <span class="badge response-token-badge">Input: <strong class="ms-1">${item.rawJsonChars ?? JSON.stringify(item.llmMessages || [], null, 2).length}</strong></span>
             <span class="badge response-time-badge">Output: <strong class="ms-1">${item.outputChars ?? countChars(item.answer || '')}</strong></span>
           </div>
         </div>
@@ -789,6 +809,7 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsContextChars.textContent = String(getContextChars(entry));
   el.historyDetailsMessageChars.textContent = String(entry.messageChars ?? countChars(entry.message || ''));
   el.historyDetailsOutputChars.textContent = String(entry.outputChars ?? countChars(entry.answer || ''));
+  el.historyDetailsRawJsonChars.textContent = String(entry.rawJsonChars ?? JSON.stringify(entry.llmMessages || [], null, 2).length);
   el.historyDetailsInputTokens.textContent = String(entry.usage?.input_tokens ?? 0);
   el.historyDetailsOutputTokens.textContent = String(entry.usage?.output_tokens ?? 0);
   el.historyDetailsTotalTokens.textContent = String(entry.usage?.total_tokens ?? 0);
@@ -798,6 +819,7 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsSystemPrompt.value = entry.systemPrompt || '';
   el.historyDetailsMessage.value = entry.message || '';
   el.historyDetailsLlmMessages.value = JSON.stringify(entry.llmMessages || [], null, 2);
+  el.historyDetailsLlmResponse.value = JSON.stringify(entry.llmResponse || {}, null, 2);
   el.historyDetailsAnswer.value = entry.answer || '';
 
   setHistoryTab('stats');
@@ -1026,6 +1048,7 @@ function renderChart() {
   if (state.chartInstance)  { state.chartInstance.destroy();  state.chartInstance  = null; }
   if (state.chartInstance2) { state.chartInstance2.destroy(); state.chartInstance2 = null; }
   if (state.chartInstance3) { state.chartInstance3.destroy(); state.chartInstance3 = null; }
+  if (state.chartInstance4) { state.chartInstance4.destroy(); state.chartInstance4 = null; }
 
   const builders = {
     cumulativeCost:        buildCumulativeCostChart,
@@ -1035,13 +1058,15 @@ function renderChart() {
 
   const result = builders[el.chartSelect.value]?.(sorted) ?? null;
   if (Array.isArray(result)) {
-    [state.chartInstance, state.chartInstance2, state.chartInstance3] = result;
-    el.chartsWrap2.classList.remove('hidden');
+    [state.chartInstance, state.chartInstance2, state.chartInstance3, state.chartInstance4] = result;
+    el.chartsWrap2.classList.toggle('hidden', result.length < 2);
     el.chartsWrap3.classList.toggle('hidden', result.length < 3);
+    el.chartsWrap4.classList.toggle('hidden', result.length < 4);
   } else {
     state.chartInstance = result;
     el.chartsWrap2.classList.add('hidden');
     el.chartsWrap3.classList.add('hidden');
+    el.chartsWrap4.classList.add('hidden');
   }
 }
 
@@ -1094,8 +1119,26 @@ function syncChartHover(source, targets) {
   });
 }
 
+function makeChartClickHandlers(sorted) {
+  return {
+    onClick: (_event, elements) => {
+      if (!elements.length) return;
+      const entry = sorted[elements[0].index];
+      if (entry) openHistoryDetailsModal(entry);
+    },
+    onHover: (event, elements) => {
+      const canvas = event.native?.target;
+      if (canvas) canvas.style.cursor = elements.length ? 'pointer' : 'default';
+    },
+  };
+}
+
 function buildTokensVsResponseTimeCharts(sorted) {
   const labels = sorted.map((_, i) => `#${i + 1}`);
+  el.chartLabel.textContent  = 'Tokens';
+  el.chartLabel2.textContent = 'Response Time';
+  el.chartLabel3.textContent = 'Cost';
+  el.chartLabel4.textContent = 'Characters';
 
   const tokensChart = new Chart(el.mainChart, {
     type: 'line',
@@ -1139,6 +1182,7 @@ function buildTokensVsResponseTimeCharts(sorted) {
       ],
     },
     options: {
+      ...makeChartClickHandlers(sorted),
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
@@ -1170,6 +1214,7 @@ function buildTokensVsResponseTimeCharts(sorted) {
       }],
     },
     options: {
+      ...makeChartClickHandlers(sorted),
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
@@ -1227,6 +1272,7 @@ function buildTokensVsResponseTimeCharts(sorted) {
       ],
     },
     options: {
+      ...makeChartClickHandlers(sorted),
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
@@ -1241,14 +1287,94 @@ function buildTokensVsResponseTimeCharts(sorted) {
     },
   });
 
-  syncChartHover(tokensChart, [timeChart, costChart]);
-  syncChartHover(timeChart,   [tokensChart, costChart]);
-  syncChartHover(costChart,   [tokensChart, timeChart]);
+  const charsChart = new Chart(el.mainChart4, {
+    type: 'line',
+    plugins: [CROSSHAIR_PLUGIN],
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'System Prompt',
+          data: sorted.map((item) => item.systemPromptChars ?? countChars(item.systemPrompt || '')),
+          borderColor: '#7c3aed',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+        {
+          label: 'Context',
+          data: sorted.map((item) => getContextChars(item)),
+          borderColor: '#0891b2',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+        {
+          label: 'Message',
+          data: sorted.map((item) => item.messageChars ?? countChars(item.message || '')),
+          borderColor: '#16a34a',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+        {
+          label: 'Input JSON',
+          data: sorted.map((item) => item.rawJsonChars ?? JSON.stringify(item.llmMessages || [], null, 2).length),
+          borderColor: '#2563eb',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+        {
+          label: 'Output',
+          data: sorted.map((item) => item.outputChars ?? countChars(item.answer || '')),
+          borderColor: '#dc2626',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      ...makeChartClickHandlers(sorted),
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } },
+      },
+      scales: {
+        x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxTicksLimit: 20 } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT }, afterFit: (s) => { s.width = 88; } },
+      },
+    },
+  });
 
-  return [tokensChart, timeChart, costChart];
+  syncChartHover(tokensChart, [timeChart, costChart, charsChart]);
+  syncChartHover(timeChart,   [tokensChart, costChart, charsChart]);
+  syncChartHover(costChart,   [tokensChart, timeChart, charsChart]);
+  syncChartHover(charsChart,  [tokensChart, timeChart, costChart]);
+
+  return [tokensChart, timeChart, costChart, charsChart];
 }
 
 function buildCumulativeTokensChart(sorted) {
+  el.chartLabel.textContent = 'Cumulative Token Usage';
   let cumInput = 0, cumOutput = 0, cumTotal = 0;
   const inputData  = sorted.map((item) => { cumInput  += item.usage?.input_tokens  ?? 0; return cumInput; });
   const outputData = sorted.map((item) => { cumOutput += item.usage?.output_tokens ?? 0; return cumOutput; });
@@ -1256,8 +1382,9 @@ function buildCumulativeTokensChart(sorted) {
 
   return new Chart(el.mainChart, {
     type: 'line',
+    plugins: [CROSSHAIR_PLUGIN],
     data: {
-      labels: sorted.map((item) => chartShortDate(item.createdAt)),
+      labels: sorted.map((_, i) => `#${i + 1}`),
       datasets: [
         {
           label: 'Total tokens',
@@ -1292,8 +1419,10 @@ function buildCumulativeTokensChart(sorted) {
       ],
     },
     options: {
+      ...makeChartClickHandlers(sorted),
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } },
       },
@@ -1306,6 +1435,7 @@ function buildCumulativeTokensChart(sorted) {
 }
 
 function buildCumulativeCostChart(sorted) {
+  el.chartLabel.textContent = 'Cumulative Cost';
   let cumInput = 0, cumOutput = 0, cumTotal = 0;
   const inputData  = sorted.map((item) => { cumInput  += item.cost?.input_cost_usd  ?? 0; return parseFloat(cumInput.toFixed(8)); });
   const outputData = sorted.map((item) => { cumOutput += item.cost?.output_cost_usd ?? 0; return parseFloat(cumOutput.toFixed(8)); });
@@ -1313,8 +1443,9 @@ function buildCumulativeCostChart(sorted) {
 
   return new Chart(el.mainChart, {
     type: 'line',
+    plugins: [CROSSHAIR_PLUGIN],
     data: {
-      labels: sorted.map((item) => chartShortDate(item.createdAt)),
+      labels: sorted.map((_, i) => `#${i + 1}`),
       datasets: [
         {
           label: 'Total cost',
@@ -1349,8 +1480,10 @@ function buildCumulativeCostChart(sorted) {
       ],
     },
     options: {
+      ...makeChartClickHandlers(sorted),
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } },
         tooltip: { callbacks: { label: (ctx) => `$${Number(ctx.raw).toFixed(8)}` } },

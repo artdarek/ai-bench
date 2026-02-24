@@ -131,9 +131,15 @@
                     <textarea id="responseSystemPromptPreview" class="form-control history-preview-textarea" rows="4" readonly></textarea>
                   </div>
                 </div>
-                <div class="mb-3">
-                  <label class="form-label fw-semibold mb-1" for="responseRawMessagePreview"><i class="bi bi-code-slash label-icon" aria-hidden="true"></i>Raw message (JSON)</label>
-                  <textarea id="responseRawMessagePreview" class="form-control response-raw-textarea" rows="8" readonly></textarea>
+                <div class="row g-3 mb-3">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label fw-semibold mb-1" for="responseRawMessagePreview"><i class="bi bi-code-slash label-icon" aria-hidden="true"></i>Raw message (JSON)</label>
+                    <textarea id="responseRawMessagePreview" class="form-control response-raw-textarea" rows="8" readonly></textarea>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label fw-semibold mb-1" for="responseRawOutputPreview"><i class="bi bi-code-square label-icon" aria-hidden="true"></i>Raw output (JSON)</label>
+                    <textarea id="responseRawOutputPreview" class="form-control response-raw-textarea" rows="8" readonly></textarea>
+                  </div>
                 </div>
 
                 <div class="usage-grid" id="usageBox">
@@ -181,6 +187,7 @@
                       <span class="badge response-token-badge">System Prompt: <strong id="systemPromptChars" class="ms-1">0</strong></span>
                       <span class="badge response-cost-badge">Context: <strong id="contextChars" class="ms-1">0</strong></span>
                       <span class="badge response-cost-badge">Message: <strong id="messageChars" class="ms-1">0</strong></span>
+                      <span class="badge response-token-badge">Input: <strong id="rawJsonChars" class="ms-1">0</strong></span>
                       <span class="badge response-time-badge">Output: <strong id="outputChars" class="ms-1">0</strong></span>
                       </div>
                     </div>
@@ -191,7 +198,7 @@
 
             <div class="main-tab-panel hidden p-3 p-md-4" data-main-panel="history">
               <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
-                <h2 class="h4 mb-0">Response History</h2>
+                <h2 class="h4 mb-0">Request History</h2>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                   <button id="compareBtn" class="btn btn-sm btn-outline-secondary compare-btn" disabled>
                     <i class="bi bi-bar-chart-line-fill me-2" aria-hidden="true"></i>Compare (0/10)
@@ -213,7 +220,7 @@
                   <i class="bi bi-bar-chart label-icon" aria-hidden="true"></i>Chart
                 </label>
                 <select id="chartSelect" class="form-select chart-select">
-                  <option value="tokensVsResponseTime" selected>Token vs Response Time vs Cost</option>
+                  <option value="tokensVsResponseTime" selected>Request / Response Metrics</option>
                   <option value="cumulativeCost">Cumulative cost</option>
                   <option value="cumulativeTokens">Cumulative token usage</option>
                 </select>
@@ -221,13 +228,28 @@
               <p id="chartsEmpty" class="text-body-secondary hidden">No history data to display charts.</p>
               <div id="chartsWrap">
                 <div class="chart-canvas-wrap">
-                  <canvas id="mainChart"></canvas>
+                  <div class="chart-label" id="chartLabel"></div>
+                  <div class="chart-canvas-inner">
+                    <canvas id="mainChart"></canvas>
+                  </div>
                 </div>
                 <div id="chartsWrap2" class="chart-canvas-wrap mt-3 hidden">
-                  <canvas id="mainChart2"></canvas>
+                  <div class="chart-label" id="chartLabel2"></div>
+                  <div class="chart-canvas-inner">
+                    <canvas id="mainChart2"></canvas>
+                  </div>
                 </div>
                 <div id="chartsWrap3" class="chart-canvas-wrap mt-3 hidden">
-                  <canvas id="mainChart3"></canvas>
+                  <div class="chart-label" id="chartLabel3"></div>
+                  <div class="chart-canvas-inner">
+                    <canvas id="mainChart3"></canvas>
+                  </div>
+                </div>
+                <div id="chartsWrap4" class="chart-canvas-wrap mt-3 hidden">
+                  <div class="chart-label" id="chartLabel4"></div>
+                  <div class="chart-canvas-inner">
+                    <canvas id="mainChart4"></canvas>
+                  </div>
                 </div>
               </div>
             </div>
@@ -267,22 +289,57 @@
               <i class="bi bi-code-slash me-1" aria-hidden="true"></i>Raw message
             </button>
           </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" type="button" role="tab" aria-selected="false" data-history-tab="rawOutput">
+              <i class="bi bi-code-square me-1" aria-hidden="true"></i>Raw output
+            </button>
+          </li>
         </ul>
 
         <section class="history-tab-panel" data-history-panel="stats">
           <div class="stats-layout">
-            <div class="history-details-grid mb-0">
-              <div class="meta-label">Run ID</div><div class="meta-value" id="historyDetailsId">-</div>
-              <div class="meta-label">Created At</div><div class="meta-value" id="historyDetailsCreatedAt">-</div>
-              <div class="meta-label">Provider</div><div class="meta-value" id="historyDetailsProvider">-</div>
-              <div class="meta-label">Model</div><div class="meta-value" id="historyDetailsModel">-</div>
-              <div class="meta-label">Deployment</div><div class="meta-value" id="historyDetailsDeployment">-</div>
-              <div class="meta-label">Response Time</div><div class="meta-value" id="historyDetailsResponseTime">0 ms</div>
-              <div class="meta-label">History Messages in Context</div><div class="meta-value" id="historyDetailsContextMessages">0</div>
-              <div class="meta-label">System Prompt Chars</div><div class="meta-value" id="historyDetailsSystemPromptChars">0</div>
-              <div class="meta-label">Context Chars</div><div class="meta-value" id="historyDetailsContextChars">0</div>
-              <div class="meta-label">Message Chars</div><div class="meta-value" id="historyDetailsMessageChars">0</div>
-              <div class="meta-label">Output Chars</div><div class="meta-value" id="historyDetailsOutputChars">0</div>
+            <div class="d-flex flex-column gap-2">
+              <div class="usage-card">
+                <h4 class="usage-card-title">Request data</h4>
+                <div class="history-details-grid">
+                  <div class="meta-label">Run ID</div><div class="meta-value" id="historyDetailsId">-</div>
+                  <div class="meta-label">Created At</div><div class="meta-value" id="historyDetailsCreatedAt">-</div>
+                </div>
+              </div>
+
+              <div class="usage-card">
+                <h4 class="usage-card-title">Provider</h4>
+                <div class="history-details-grid">
+                  <div class="meta-label">Provider</div><div class="meta-value" id="historyDetailsProvider">-</div>
+                  <div class="meta-label">Model</div><div class="meta-value" id="historyDetailsModel">-</div>
+                  <div class="meta-label">Deployment</div><div class="meta-value" id="historyDetailsDeployment">-</div>
+                </div>
+              </div>
+
+              <div class="usage-card d-flex align-items-center justify-content-between gap-3">
+                <h4 class="usage-card-title mb-0">Time</h4>
+                <div class="usage-inline-badges d-flex align-items-center gap-2">
+                  <span class="badge response-time-badge">Response: <strong id="historyDetailsResponseTime" class="ms-1">0 ms</strong></span>
+                </div>
+              </div>
+
+              <div class="usage-card d-flex align-items-center justify-content-between gap-3">
+                <h4 class="usage-card-title mb-0">Context</h4>
+                <div class="usage-inline-badges d-flex align-items-center gap-2">
+                  <span class="badge response-token-badge">Messages included: <strong id="historyDetailsContextMessages" class="ms-1">0</strong></span>
+                </div>
+              </div>
+
+              <div class="usage-card">
+                <h4 class="usage-card-title">Characters</h4>
+                <div class="d-flex flex-wrap gap-2">
+                  <span class="badge response-token-badge">System Prompt: <strong id="historyDetailsSystemPromptChars" class="ms-1">0</strong></span>
+                  <span class="badge response-cost-badge">Context: <strong id="historyDetailsContextChars" class="ms-1">0</strong></span>
+                  <span class="badge response-cost-badge">Message: <strong id="historyDetailsMessageChars" class="ms-1">0</strong></span>
+                  <span class="badge response-token-badge">Input: <strong id="historyDetailsRawJsonChars" class="ms-1">0</strong></span>
+                  <span class="badge response-time-badge">Output: <strong id="historyDetailsOutputChars" class="ms-1">0</strong></span>
+                </div>
+              </div>
             </div>
 
             <div class="usage-grid usage-grid-compact">
@@ -327,6 +384,11 @@
         <section class="history-tab-panel history-tab-panel-fill hidden" data-history-panel="raw">
           <label class="form-label fw-semibold mb-1" for="historyDetailsLlmMessages">Final LLM Messages (raw JSON)</label>
           <textarea id="historyDetailsLlmMessages" class="history-details-content form-control mb-0" rows="12" readonly></textarea>
+        </section>
+
+        <section class="history-tab-panel history-tab-panel-fill hidden" data-history-panel="rawOutput">
+          <label class="form-label fw-semibold mb-1" for="historyDetailsLlmResponse">LLM Response (raw JSON)</label>
+          <textarea id="historyDetailsLlmResponse" class="history-details-content form-control mb-0" rows="12" readonly></textarea>
         </section>
       </div>
     </div>

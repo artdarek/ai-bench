@@ -417,7 +417,7 @@
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .cost-badge,
@@ -596,6 +596,23 @@
 }
 
 .chart-canvas-wrap {
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.chart-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chart-canvas-inner {
   position: relative;
-  height: 380px;
+  height: 360px;
 }
