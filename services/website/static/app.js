@@ -94,6 +94,7 @@ const el = {
   historyDetailsInputCost: document.getElementById('historyDetailsInputCost'),
   historyDetailsOutputCost: document.getElementById('historyDetailsOutputCost'),
   historyDetailsTotalCost: document.getElementById('historyDetailsTotalCost'),
+  historyDetailsTokenChart: document.getElementById('historyDetailsTokenChart'),
   historyDetailsSystemPrompt: document.getElementById('historyDetailsSystemPrompt'),
   historyDetailsMessage: document.getElementById('historyDetailsMessage'),
   historyDetailsLlmMessages: document.getElementById('historyDetailsLlmMessages'),
@@ -1048,6 +1049,66 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsLlmResponse.value = JSON.stringify(entry.llmResponse || {}, null, 2);
   el.historyDetailsAnswer.value = entry.answer || '';
 
+  const inputTokens = entry.usage?.input_tokens ?? 0;
+  const outputTokens = entry.usage?.output_tokens ?? 0;
+  if (historyTokenPieChart) {
+    historyTokenPieChart.destroy();
+    historyTokenPieChart = null;
+  }
+  const doughnutPctLabels = {
+    id: 'doughnutPctLabels',
+    afterDatasetDraw(chart) {
+      const { ctx, data } = chart;
+      const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+      if (!total) return;
+      chart.getDatasetMeta(0).data.forEach((arc, i) => {
+        const value = data.datasets[0].data[i];
+        const pct = Math.round((value / total) * 100);
+        if (pct < 5) return;
+        const mid = arc.startAngle + (arc.endAngle - arc.startAngle) / 2;
+        const r = (arc.innerRadius + arc.outerRadius) / 2;
+        const x = arc.x + Math.cos(mid) * r;
+        const y = arc.y + Math.sin(mid) * r;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText(`${pct}%`, x, y);
+        ctx.restore();
+      });
+    },
+  };
+
+  historyTokenPieChart = new Chart(el.historyDetailsTokenChart, {
+    type: 'doughnut',
+    plugins: [doughnutPctLabels],
+    data: {
+      labels: ['Input', 'Output'],
+      datasets: [{
+        data: [inputTokens, outputTokens],
+        backgroundColor: ['#2563eb', '#16a34a'],
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: CHART_FONT, boxWidth: 12 }, onClick: () => {} },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? Math.round((ctx.parsed / total) * 100) : 0;
+              return ` ${ctx.label}: ${ctx.parsed.toLocaleString()} tokens (${pct}%)`;
+            },
+          },
+        },
+      },
+    },
+  });
+
   setHistoryTab('stats');
   el.historyDetailsModal.classList.remove('hidden');
 }
@@ -1301,6 +1362,8 @@ function chartShortDate(iso) {
   const p = (n) => String(n).padStart(2, '0');
   return `${p(d.getDate())}/${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+let historyTokenPieChart = null;
 
 const CHART_GRID = { color: 'rgba(0,0,0,0.05)' };
 const CHART_FONT = { size: 11 };

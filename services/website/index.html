@@ -406,28 +406,36 @@
               </div>
             </div>
 
-            <div class="usage-grid usage-grid-compact">
-              <article class="usage-card">
-                <h4 class="usage-card-title">Input</h4>
-                <div class="d-flex flex-wrap gap-2">
-                  <span class="badge response-token-badge">Tokens: <strong id="historyDetailsInputTokens" class="ms-1">0</strong></span>
-                  <span class="badge response-cost-badge">Cost: <strong id="historyDetailsInputCost" class="ms-1">$0.00000000</strong></span>
+            <div class="d-flex flex-column gap-2">
+              <div class="usage-card">
+                <h4 class="usage-card-title">Usage chart</h4>
+                <div class="d-flex align-items-center justify-content-center">
+                  <canvas id="historyDetailsTokenChart" style="max-height: 180px;"></canvas>
                 </div>
-              </article>
-              <article class="usage-card">
-                <h4 class="usage-card-title">Output</h4>
-                <div class="d-flex flex-wrap gap-2">
-                  <span class="badge response-token-badge">Tokens: <strong id="historyDetailsOutputTokens" class="ms-1">0</strong></span>
-                  <span class="badge response-cost-badge">Cost: <strong id="historyDetailsOutputCost" class="ms-1">$0.00000000</strong></span>
-                </div>
-              </article>
-              <article class="usage-card">
-                <h4 class="usage-card-title">Total</h4>
-                <div class="d-flex flex-wrap gap-2">
-                  <span class="badge response-token-badge">Tokens: <strong id="historyDetailsTotalTokens" class="ms-1">0</strong></span>
-                  <span class="badge response-cost-badge">Cost: <strong id="historyDetailsTotalCost" class="ms-1">$0.00000000</strong></span>
-                </div>
-              </article>
+              </div>
+              <div class="usage-grid usage-grid-compact">
+                <article class="usage-card d-flex align-items-center justify-content-between gap-2">
+                  <h4 class="usage-card-title mb-0">Input</h4>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge response-token-badge">Tokens: <strong id="historyDetailsInputTokens" class="ms-1">0</strong></span>
+                    <span class="badge response-cost-badge">Cost: <strong id="historyDetailsInputCost" class="ms-1">$0.00000000</strong></span>
+                  </div>
+                </article>
+                <article class="usage-card d-flex align-items-center justify-content-between gap-2">
+                  <h4 class="usage-card-title mb-0">Output</h4>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge response-token-badge">Tokens: <strong id="historyDetailsOutputTokens" class="ms-1">0</strong></span>
+                    <span class="badge response-cost-badge">Cost: <strong id="historyDetailsOutputCost" class="ms-1">$0.00000000</strong></span>
+                  </div>
+                </article>
+                <article class="usage-card d-flex align-items-center justify-content-between gap-2">
+                  <h4 class="usage-card-title mb-0">Total</h4>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge response-token-badge">Tokens: <strong id="historyDetailsTotalTokens" class="ms-1">0</strong></span>
+                    <span class="badge response-cost-badge">Cost: <strong id="historyDetailsTotalCost" class="ms-1">$0.00000000</strong></span>
+                  </div>
+                </article>
+              </div>
             </div>
           </div>
         </section>
