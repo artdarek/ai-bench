@@ -1,0 +1,23 @@
+config/providers.json
+  fb50b34988f0f5b6 25-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "986ea49f89d8c3a2321907a4c08c9c7bf5a40036",
+  "prompts": {
+    "fb50b34988f0f5b6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019c8f93-fc14-7ed1-aea3-5f816a8743e4",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
