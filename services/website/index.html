@@ -116,13 +116,13 @@
                 </button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="nav-link" type="button" role="tab" aria-selected="false" data-main-tab="history">
+                <button class="nav-link" type="button" role="tab" aria-selected="false" data-main-tab="history" id="historyTabBtn">
                   <i class="bi bi-clock-history me-1" aria-hidden="true"></i>History
                 </button>
               </li>
               <li class="nav-item" role="presentation">
                 <button class="nav-link" type="button" role="tab" aria-selected="false" data-main-tab="charts">
-                  <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>Charts
+                  <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>Stats
                 </button>
               </li>
             </ul>
@@ -181,6 +181,8 @@
                     <div class="d-flex flex-wrap gap-2">
                       <span class="badge response-token-badge">Tokens: <strong id="inputTokens" class="ms-1">0</strong></span>
                       <span class="badge response-cost-badge">Cost: <strong id="inputCost" class="ms-1">$0.00000000</strong></span>
+                      <span class="badge response-token-badge" id="inputCachedTokensBadge" style="display:none">Cached: <strong id="inputCachedTokens" class="ms-1">0</strong></span>
+                      <span class="badge response-token-badge" id="inputNonCachedTokensBadge" style="display:none">Non-cached: <strong id="inputNonCachedTokens" class="ms-1">0</strong></span>
                     </div>
                   </article>
                   <article class="usage-card">
@@ -269,8 +271,7 @@
                 </label>
                 <select id="chartSelect" class="form-select chart-select">
                   <option value="tokensVsResponseTime" selected>Request / Response Metrics</option>
-                  <option value="cumulativeCost">Cumulative cost</option>
-                  <option value="cumulativeTokens">Cumulative token usage</option>
+                  <option value="cumulativeUsage">Cumulative usage</option>
                 </select>
               </div>
               <p id="chartsEmpty" class="text-body-secondary hidden">No history data to display charts.</p>
@@ -443,11 +444,29 @@
                 </div>
               </div>
               <div class="usage-grid usage-grid-compact">
-                <article class="usage-card d-flex align-items-center justify-content-between gap-2">
-                  <h4 class="usage-card-title mb-0">Input</h4>
-                  <div class="d-flex align-items-center gap-2">
-                    <span class="badge response-token-badge">Tokens: <strong id="historyDetailsInputTokens" class="ms-1">0</strong></span>
-                    <span class="badge response-cost-badge">Cost: <strong id="historyDetailsInputCost" class="ms-1">$0.00000000</strong></span>
+                <article class="usage-card">
+                  <div class="d-flex align-items-center justify-content-between gap-2">
+                    <h4 class="usage-card-title mb-0">Input</h4>
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="badge response-token-badge">Tokens: <strong id="historyDetailsInputTokens" class="ms-1">0</strong></span>
+                      <span class="badge response-cost-badge">Cost: <strong id="historyDetailsInputCost" class="ms-1">$0.00000000</strong></span>
+                    </div>
+                  </div>
+                  <div id="historyDetailsInputCacheBreakdown" style="display:none">
+                    <div class="d-flex align-items-center justify-content-between gap-2 mt-1 ps-2 border-start border-secondary-subtle">
+                      <span class="usage-card-subtitle text-body-secondary">Non-cached</span>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="badge response-token-badge">Tokens: <strong id="historyDetailsInputNonCachedTokens" class="ms-1">0</strong></span>
+                        <span class="badge response-cost-badge">Cost: <strong id="historyDetailsInputNonCachedCost" class="ms-1">$0.00000000</strong></span>
+                      </div>
+                    </div>
+                    <div class="d-flex align-items-center justify-content-between gap-2 mt-1 ps-2 border-start border-secondary-subtle">
+                      <span class="usage-card-subtitle text-body-secondary">Cached</span>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="badge response-token-badge">Tokens: <strong id="historyDetailsInputCachedTokens" class="ms-1">0</strong></span>
+                        <span class="badge response-cost-badge">Cost: <strong id="historyDetailsInputCachedCost" class="ms-1">$0.00000000</strong></span>
+                      </div>
+                    </div>
                   </div>
                 </article>
                 <article class="usage-card d-flex align-items-center justify-content-between gap-2">

@@ -58,6 +58,10 @@ const el = {
   responseRawOutputPreview: document.getElementById('responseRawOutputPreview'),
   rawJsonChars: document.getElementById('rawJsonChars'),
   inputTokens: document.getElementById('inputTokens'),
+  inputCachedTokens: document.getElementById('inputCachedTokens'),
+  inputCachedTokensBadge: document.getElementById('inputCachedTokensBadge'),
+  inputNonCachedTokens: document.getElementById('inputNonCachedTokens'),
+  inputNonCachedTokensBadge: document.getElementById('inputNonCachedTokensBadge'),
   outputTokens: document.getElementById('outputTokens'),
   inputCost: document.getElementById('inputCost'),
   outputCost: document.getElementById('outputCost'),
@@ -70,6 +74,7 @@ const el = {
   messageChars: document.getElementById('messageChars'),
   outputChars: document.getElementById('outputChars'),
   history: document.getElementById('history'),
+  historyTabBtn: document.getElementById('historyTabBtn'),
   historyDetailsModal: document.getElementById('historyDetailsModal'),
   historyDetailsCloseBtn: document.getElementById('historyDetailsCloseBtn'),
   mainTabButtons: Array.from(document.querySelectorAll('[data-main-tab]')),
@@ -89,6 +94,11 @@ const el = {
   historyDetailsOutputChars: document.getElementById('historyDetailsOutputChars'),
   historyDetailsRawJsonChars: document.getElementById('historyDetailsRawJsonChars'),
   historyDetailsInputTokens: document.getElementById('historyDetailsInputTokens'),
+  historyDetailsInputCacheBreakdown: document.getElementById('historyDetailsInputCacheBreakdown'),
+  historyDetailsInputCachedTokens: document.getElementById('historyDetailsInputCachedTokens'),
+  historyDetailsInputCachedCost: document.getElementById('historyDetailsInputCachedCost'),
+  historyDetailsInputNonCachedTokens: document.getElementById('historyDetailsInputNonCachedTokens'),
+  historyDetailsInputNonCachedCost: document.getElementById('historyDetailsInputNonCachedCost'),
   historyDetailsOutputTokens: document.getElementById('historyDetailsOutputTokens'),
   historyDetailsTotalTokens: document.getElementById('historyDetailsTotalTokens'),
   historyDetailsInputCost: document.getElementById('historyDetailsInputCost'),
@@ -512,6 +522,12 @@ async function onSend() {
     el.inputCost.textContent = `$${formatUsd(payload.cost?.input_cost_usd ?? 0)}`;
     el.outputCost.textContent = `$${formatUsd(payload.cost?.output_cost_usd ?? 0)}`;
     el.totalTokens.textContent = String(payload.usage?.total_tokens ?? 0);
+    const cachedTokens = payload.usage?.input_cached_tokens ?? 0;
+    const nonCachedTokens = payload.usage?.input_non_cached_tokens ?? 0;
+    el.inputCachedTokens.textContent = String(cachedTokens);
+    el.inputNonCachedTokens.textContent = String(nonCachedTokens);
+    el.inputCachedTokensBadge.style.display = cachedTokens > 0 ? '' : 'none';
+    el.inputNonCachedTokensBadge.style.display = cachedTokens > 0 ? '' : 'none';
     el.totalCost.textContent = `$${formatUsd(payload.cost?.total_cost_usd ?? 0)}`;
     el.responseTimeMs.textContent = formatResponseTimeMs(responseTimeMs);
     el.systemPromptChars.textContent = String(systemPromptChars);
@@ -560,6 +576,8 @@ async function onSend() {
 
 function renderHistory() {
   updateHistoryActionButtons();
+  const count = state.history.length;
+  el.historyTabBtn.innerHTML = `<i class="bi bi-clock-history me-1" aria-hidden="true"></i>History${count > 0 ? ` (${count})` : ''}`;
 
   if (!state.history.length) {
     el.history.innerHTML = '<p>No saved runs yet.</p>';
@@ -651,10 +669,27 @@ function renderHistory() {
         <div class="usage-grid usage-grid-compact history-usage-grid mt-2">
           <article class="usage-card">
             <h4 class="usage-card-title">Input</h4>
-            <div class="d-flex flex-wrap gap-2">
-              <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage?.input_tokens ?? 0}</strong></span>
-              <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.input_cost_usd ?? 0)}</strong></span>
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <div class="d-flex flex-wrap gap-2">
+                <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage?.input_tokens ?? 0}</strong></span>
+                <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.input_cost_usd ?? 0)}</strong></span>
+              </div>
             </div>
+            ${(item.usage?.input_cached_tokens ?? 0) > 0 ? `
+            <div class="d-flex align-items-center justify-content-between gap-2 mt-1 ps-2 border-start border-secondary-subtle">
+              <span class="usage-card-subtitle text-body-secondary">Non-cached</span>
+              <div class="d-flex flex-wrap gap-2">
+                <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage.input_non_cached_tokens ?? 0}</strong></span>
+                <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.input_non_cached_cost_usd ?? 0)}</strong></span>
+              </div>
+            </div>
+            <div class="d-flex align-items-center justify-content-between gap-2 mt-1 ps-2 border-start border-secondary-subtle">
+              <span class="usage-card-subtitle text-body-secondary">Cached</span>
+              <div class="d-flex flex-wrap gap-2">
+                <span class="badge response-token-badge">Tokens: <strong class="ms-1">${item.usage.input_cached_tokens}</strong></span>
+                <span class="badge response-cost-badge">Cost: <strong class="ms-1">$${formatUsd(item.cost?.input_cached_cost_usd ?? 0)}</strong></span>
+              </div>
+            </div>` : ''}
           </article>
           <article class="usage-card">
             <h4 class="usage-card-title">Output</h4>
@@ -928,9 +963,13 @@ function buildCsvContent(items) {
     'model',
     'deployment',
     'inputTokens',
+    'inputCachedTokens',
+    'inputNonCachedTokens',
     'outputTokens',
     'totalTokens',
     'inputCostUsd',
+    'inputNonCachedCostUsd',
+    'inputCachedCostUsd',
     'outputCostUsd',
     'totalCostUsd',
     'responseTimeMs',
@@ -951,9 +990,13 @@ function buildCsvContent(items) {
     item.model,
     item.deployment,
     item.usage?.input_tokens ?? '',
+    item.usage?.input_cached_tokens ?? '',
+    item.usage?.input_non_cached_tokens ?? '',
     item.usage?.output_tokens ?? '',
     item.usage?.total_tokens ?? '',
     item.cost?.input_cost_usd ?? '',
+    item.cost?.input_non_cached_cost_usd ?? '',
+    item.cost?.input_cached_cost_usd ?? '',
     item.cost?.output_cost_usd ?? '',
     item.cost?.total_cost_usd ?? '',
     item.responseTimeMs ?? '',
@@ -1043,6 +1086,7 @@ function setStatus(text, type = 'info') {
 function formatUsd(value) {
   return Number(value || 0).toFixed(8);
 }
+
 
 function formatResponseTimeMs(value) {
   const numeric = Number(value);
@@ -1181,6 +1225,12 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsInputTokens.textContent = String(entry.usage?.input_tokens ?? 0);
   el.historyDetailsOutputTokens.textContent = String(entry.usage?.output_tokens ?? 0);
   el.historyDetailsTotalTokens.textContent = String(entry.usage?.total_tokens ?? 0);
+  const detailsCachedTokens = entry.usage?.input_cached_tokens ?? 0;
+  el.historyDetailsInputCachedTokens.textContent = String(detailsCachedTokens);
+  el.historyDetailsInputCachedCost.textContent = `$${formatUsd(entry.cost?.input_cached_cost_usd ?? 0)}`;
+  el.historyDetailsInputNonCachedTokens.textContent = String(entry.usage?.input_non_cached_tokens ?? 0);
+  el.historyDetailsInputNonCachedCost.textContent = `$${formatUsd(entry.cost?.input_non_cached_cost_usd ?? 0)}`;
+  el.historyDetailsInputCacheBreakdown.style.display = detailsCachedTokens > 0 ? '' : 'none';
   el.historyDetailsInputCost.textContent = `$${formatUsd(entry.cost?.input_cost_usd ?? 0)}`;
   el.historyDetailsOutputCost.textContent = `$${formatUsd(entry.cost?.output_cost_usd ?? 0)}`;
   el.historyDetailsTotalCost.textContent = `$${formatUsd(entry.cost?.total_cost_usd ?? 0)}`;
@@ -1389,9 +1439,13 @@ function getCompareMetrics() {
     { label: 'Message Chars', fn: (e) => String(e.messageChars ?? countChars(e.message || '')) },
     { label: 'Output Chars', fn: (e) => String(e.outputChars ?? countChars(e.answer || '')) },
     { label: 'Input Tokens', fn: (e) => String(e.usage?.input_tokens ?? 0) },
+    { label: 'Input Cached Tokens', fn: (e) => String(e.usage?.input_cached_tokens ?? 0) },
+    { label: 'Input Non-cached Tokens', fn: (e) => String(e.usage?.input_non_cached_tokens ?? 0) },
     { label: 'Output Tokens', fn: (e) => String(e.usage?.output_tokens ?? 0) },
     { label: 'Total Tokens', fn: (e) => String(e.usage?.total_tokens ?? 0) },
     { label: 'Input Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_cost_usd ?? 0)}` },
+    { label: 'Input Non-cached Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_non_cached_cost_usd ?? 0)}` },
+    { label: 'Input Cached Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_cached_cost_usd ?? 0)}` },
     { label: 'Output Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.output_cost_usd ?? 0)}` },
     { label: 'Total Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.total_cost_usd ?? 0)}` },
     { label: 'System Prompt', fn: (e) => e.systemPrompt || '' },
@@ -1489,8 +1543,7 @@ function renderChart() {
   if (state.chartInstance4) { state.chartInstance4.destroy(); state.chartInstance4 = null; }
 
   const builders = {
-    cumulativeCost:        buildCumulativeCostChart,
-    cumulativeTokens:      buildCumulativeTokensChart,
+    cumulativeUsage:       buildCumulativeUsageCharts,
     tokensVsResponseTime:  buildTokensVsResponseTimeCharts,
   };
 
@@ -1813,49 +1866,23 @@ function buildTokensVsResponseTimeCharts(sorted) {
   return [tokensChart, timeChart, costChart, charsChart];
 }
 
-function buildCumulativeTokensChart(sorted) {
+function buildCumulativeUsageCharts(sorted) {
   el.chartLabel.textContent = 'Cumulative Token Usage';
   let cumInput = 0, cumOutput = 0, cumTotal = 0;
-  const inputData  = sorted.map((item) => { cumInput  += item.usage?.input_tokens  ?? 0; return cumInput; });
-  const outputData = sorted.map((item) => { cumOutput += item.usage?.output_tokens ?? 0; return cumOutput; });
-  const totalData  = sorted.map((item) => { cumTotal  += item.usage?.total_tokens  ?? 0; return cumTotal; });
+  const tokenInputData  = sorted.map((item) => { cumInput  += item.usage?.input_tokens  ?? 0; return cumInput; });
+  const tokenOutputData = sorted.map((item) => { cumOutput += item.usage?.output_tokens ?? 0; return cumOutput; });
+  const tokenTotalData  = sorted.map((item) => { cumTotal  += item.usage?.total_tokens  ?? 0; return cumTotal; });
+  const labels = sorted.map((_, i) => `#${i + 1}`);
 
-  return new Chart(el.mainChart, {
+  const tokensChart = new Chart(el.mainChart, {
     type: 'line',
     plugins: [CROSSHAIR_PLUGIN],
     data: {
-      labels: sorted.map((_, i) => `#${i + 1}`),
+      labels,
       datasets: [
-        {
-          label: 'Total tokens',
-          data: totalData,
-          borderColor: '#dc2626',
-          backgroundColor: 'rgba(220,38,38,0.08)',
-          tension: 0.1,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-        },
-        {
-          label: 'Input tokens',
-          data: inputData,
-          borderColor: '#16a34a',
-          backgroundColor: 'rgba(22,163,74,0.08)',
-          tension: 0.1,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-        },
-        {
-          label: 'Output tokens',
-          data: outputData,
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37,99,235,0.08)',
-          tension: 0.1,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-        },
+        { label: 'Total tokens',  data: tokenTotalData,  borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)',  tension: 0.1, fill: true, pointRadius: 3, pointHoverRadius: 5 },
+        { label: 'Input tokens',  data: tokenInputData,  borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.08)',  tension: 0.1, fill: true, pointRadius: 3, pointHoverRadius: 5 },
+        { label: 'Output tokens', data: tokenOutputData, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.08)', tension: 0.1, fill: true, pointRadius: 3, pointHoverRadius: 5 },
       ],
     },
     options: {
@@ -1863,60 +1890,29 @@ function buildCumulativeTokensChart(sorted) {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } },
-      },
+      plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: CHART_FONT } } },
       scales: {
         x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxRotation: 30, maxTicksLimit: 20 } },
-        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT }, afterFit: (s) => { s.width = 88; } },
       },
     },
   });
-}
 
-function buildCumulativeCostChart(sorted) {
-  el.chartLabel.textContent = 'Cumulative Cost';
-  let cumInput = 0, cumOutput = 0, cumTotal = 0;
-  const inputData  = sorted.map((item) => { cumInput  += item.cost?.input_cost_usd  ?? 0; return parseFloat(cumInput.toFixed(8)); });
-  const outputData = sorted.map((item) => { cumOutput += item.cost?.output_cost_usd ?? 0; return parseFloat(cumOutput.toFixed(8)); });
-  const totalData  = sorted.map((item) => { cumTotal  += item.cost?.total_cost_usd  ?? 0; return parseFloat(cumTotal.toFixed(8)); });
+  el.chartLabel2.textContent = 'Cumulative Cost';
+  let cumCostInput = 0, cumCostOutput = 0, cumCostTotal = 0;
+  const costInputData  = sorted.map((item) => { cumCostInput  += item.cost?.input_cost_usd  ?? 0; return parseFloat(cumCostInput.toFixed(8)); });
+  const costOutputData = sorted.map((item) => { cumCostOutput += item.cost?.output_cost_usd ?? 0; return parseFloat(cumCostOutput.toFixed(8)); });
+  const costTotalData  = sorted.map((item) => { cumCostTotal  += item.cost?.total_cost_usd  ?? 0; return parseFloat(cumCostTotal.toFixed(8)); });
 
-  return new Chart(el.mainChart, {
+  const costChart = new Chart(el.mainChart2, {
     type: 'line',
     plugins: [CROSSHAIR_PLUGIN],
     data: {
-      labels: sorted.map((_, i) => `#${i + 1}`),
+      labels,
       datasets: [
-        {
-          label: 'Total cost',
-          data: totalData,
-          borderColor: '#dc2626',
-          backgroundColor: 'rgba(220,38,38,0.08)',
-          tension: 0.1,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-        },
-        {
-          label: 'Input cost',
-          data: inputData,
-          borderColor: '#16a34a',
-          backgroundColor: 'rgba(22,163,74,0.08)',
-          tension: 0.1,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-        },
-        {
-          label: 'Output cost',
-          data: outputData,
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37,99,235,0.08)',
-          tension: 0.1,
-          fill: true,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-        },
+        { label: 'Total cost',  data: costTotalData,  borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)',  tension: 0.1, fill: true, pointRadius: 3, pointHoverRadius: 5 },
+        { label: 'Input cost',  data: costInputData,  borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.08)',  tension: 0.1, fill: true, pointRadius: 3, pointHoverRadius: 5 },
+        { label: 'Output cost', data: costOutputData, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.08)', tension: 0.1, fill: true, pointRadius: 3, pointHoverRadius: 5 },
       ],
     },
     options: {
@@ -1930,8 +1926,13 @@ function buildCumulativeCostChart(sorted) {
       },
       scales: {
         x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxRotation: 30, maxTicksLimit: 20 } },
-        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, callback: (v) => `$${Number(v).toFixed(6)}` } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, callback: (v) => `$${Number(v).toFixed(6)}` }, afterFit: (s) => { s.width = 88; } },
       },
     },
   });
+
+  syncChartHover(tokensChart, costChart);
+  syncChartHover(costChart, tokensChart);
+
+  return [tokensChart, costChart];
 }

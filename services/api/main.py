@@ -37,10 +37,14 @@ class UsageDto(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+    input_cached_tokens: int = 0
+    input_non_cached_tokens: int = 0
 
 
 class CostDto(BaseModel):
     input_cost_usd: float = 0.0
+    input_non_cached_cost_usd: float = 0.0
+    input_cached_cost_usd: float = 0.0
     output_cost_usd: float = 0.0
     total_cost_usd: float = 0.0
 
@@ -57,18 +61,24 @@ def load_provider_config() -> dict[str, Any]:
 def get_pricing(provider_cfg: dict[str, Any], model_name: str) -> dict[str, float]:
     pricing = provider_cfg.get('pricing', {}).get(model_name)
     if not pricing:
-        return {'input_per_1m_tokens_usd': 0.0, 'output_per_1m_tokens_usd': 0.0}
+        return {'input_per_1m_tokens_usd': 0.0, 'input_cached_per_1m_tokens_usd': 0.0, 'output_per_1m_tokens_usd': 0.0}
+    input_price = float(pricing.get('input_per_1m_tokens_usd', 0.0))
     return {
-        'input_per_1m_tokens_usd': float(pricing.get('input_per_1m_tokens_usd', 0.0)),
+        'input_per_1m_tokens_usd': input_price,
+        'input_cached_per_1m_tokens_usd': float(pricing.get('input_cached_per_1m_tokens_usd', input_price)),
         'output_per_1m_tokens_usd': float(pricing.get('output_per_1m_tokens_usd', 0.0)),
     }
 
 
 def estimate_cost(usage: UsageDto, pricing: dict[str, float]) -> CostDto:
-    input_cost = (usage.input_tokens / 1_000_000) * pricing['input_per_1m_tokens_usd']
+    non_cached_cost = (usage.input_non_cached_tokens / 1_000_000) * pricing['input_per_1m_tokens_usd']
+    cached_cost = (usage.input_cached_tokens / 1_000_000) * pricing['input_cached_per_1m_tokens_usd']
+    input_cost = non_cached_cost + cached_cost
     output_cost = (usage.output_tokens / 1_000_000) * pricing['output_per_1m_tokens_usd']
     return CostDto(
         input_cost_usd=round(input_cost, 8),
+        input_non_cached_cost_usd=round(non_cached_cost, 8),
+        input_cached_cost_usd=round(cached_cost, 8),
         output_cost_usd=round(output_cost, 8),
         total_cost_usd=round(input_cost + output_cost, 8),
     )
@@ -193,10 +203,15 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
             ) from exc
         raise HTTPException(status_code=502, detail=f'Provider call failed: {error_message}') from exc
 
+    raw_input_tokens = int(getattr(completion.usage, 'prompt_tokens', 0) or 0)
+    prompt_details = getattr(completion.usage, 'prompt_tokens_details', None)
+    input_cached = int(getattr(prompt_details, 'cached_tokens', 0) or 0)
     usage = UsageDto(
-        input_tokens=int(getattr(completion.usage, 'prompt_tokens', 0) or 0),
+        input_tokens=raw_input_tokens,
         output_tokens=int(getattr(completion.usage, 'completion_tokens', 0) or 0),
         total_tokens=int(getattr(completion.usage, 'total_tokens', 0) or 0),
+        input_cached_tokens=input_cached,
+        input_non_cached_tokens=raw_input_tokens - input_cached,
     )
 
     pricing = get_pricing(provider_cfg, model_name)
