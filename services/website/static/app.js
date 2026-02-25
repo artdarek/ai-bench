@@ -106,8 +106,10 @@ const el = {
   historyConfirmCloseBtn: document.getElementById('historyConfirmCloseBtn'),
   historyConfirmCancelBtn: document.getElementById('historyConfirmCancelBtn'),
   historyConfirmActionBtn: document.getElementById('historyConfirmActionBtn'),
+  historySelectAll: document.getElementById('historySelectAll'),
   historyViewToggleBtn: document.getElementById('historyViewToggleBtn'),
   compareBtn: document.getElementById('compareBtn'),
+  deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
   compareModal: document.getElementById('compareModal'),
   compareCloseBtn: document.getElementById('compareCloseBtn'),
   compareTableHead: document.getElementById('compareTableHead'),
@@ -172,11 +174,13 @@ async function init() {
   el.historyConfirmCloseBtn.addEventListener('click', closeConfirmModal);
   el.historyConfirmCancelBtn.addEventListener('click', closeConfirmModal);
   el.historyConfirmActionBtn.addEventListener('click', confirmModalAction);
+  el.historySelectAll.addEventListener('change', onHistorySelectAll);
   el.historyViewToggleBtn.addEventListener('click', toggleHistoryView);
   el.mainTabButtons.forEach((button) => button.addEventListener('click', onMainTabClick));
   el.historyTabButtons.forEach((button) => button.addEventListener('click', onHistoryTabClick));
   el.chartSelect.addEventListener('change', renderChart);
   el.compareBtn.addEventListener('click', openCompareModal);
+  el.deleteSelectedBtn.addEventListener('click', openDeleteSelectedConfirmModal);
   el.compareCloseBtn.addEventListener('click', closeCompareModal);
   el.compareModal.addEventListener('click', onCompareModalClick);
   el.compareExportBtn.addEventListener('click', exportCompareCsv);
@@ -195,10 +199,43 @@ async function init() {
   el.settingsRemoveKeyBtn.addEventListener('click', removeSettingsProviderKey);
   el.settingsToggleApiKeyBtn.addEventListener('click', toggleSettingsApiKeyVisibility);
   el.settingsApiKey.addEventListener('keydown', onSettingsApiKeyKeyDown);
+  document.querySelectorAll('.textarea-action-btn[data-copy]').forEach((btn) => {
+    btn.addEventListener('click', onTextareaActionCopy);
+  });
+  document.querySelectorAll('.textarea-action-btn[data-reuse]').forEach((btn) => {
+    btn.addEventListener('click', onTextareaActionReuse);
+  });
   onHistoryToggleChange();
   resizeMessageInput();
   updateSettingsModalState();
   updateKeyIndicator();
+}
+
+function onTextareaActionCopy(e) {
+  const btn = e.currentTarget;
+  const sourceId = btn.dataset.copy;
+  const text = document.getElementById(sourceId)?.value ?? '';
+  navigator.clipboard.writeText(text).then(() => {
+    const icon = btn.querySelector('i');
+    icon.className = 'bi bi-clipboard-check';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      icon.className = 'bi bi-clipboard';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+function onTextareaActionReuse(e) {
+  const btn = e.currentTarget;
+  const sourceId = btn.dataset.reuse;
+  const targetId = btn.dataset.target;
+  const text = document.getElementById(sourceId)?.value ?? '';
+  const target = document.getElementById(targetId);
+  if (target) {
+    target.value = text;
+    target.dispatchEvent(new Event('input'));
+  }
 }
 
 function setupProviderOptions() {
@@ -532,9 +569,8 @@ function renderHistory() {
     .map(
       (item) => {
         const isChecked = state.compareSelection.has(item.id);
-        const isDisabled = !isChecked && state.compareSelection.size >= MAX_COMPARE;
         return `<div class="history-item-wrap">
-        <input class="form-check-input history-compare-cb history-compare-cb-outer" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''}${isDisabled ? ' disabled' : ''} title="Select for comparison (max ${MAX_COMPARE})" aria-label="Select run for comparison">
+        <input class="form-check-input history-compare-cb history-compare-cb-outer" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''} title="Select for comparison" aria-label="Select run for comparison">
         <article class="history-item${isChecked ? ' history-item-selected' : ''}">
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div class="meta history-meta-line">
@@ -559,15 +595,32 @@ function renderHistory() {
         </div>
         <div class="history-preview-grid mt-2">
           <div class="history-preview-field">
-            <label class="form-label fw-semibold mb-1"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+            <div class="textarea-label-row">
+              <label class="form-label fw-semibold mb-0"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+              <div class="textarea-action-btns">
+                <button class="textarea-action-btn" title="Copy to clipboard" data-action="copy"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+                <button class="textarea-action-btn" title="Reuse as message" data-action="reuse" data-target="message"><i class="bi bi-arrow-return-left" aria-hidden="true"></i></button>
+              </div>
+            </div>
             <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.message || '')}</textarea>
           </div>
           <div class="history-preview-field">
-            <label class="form-label fw-semibold mb-1"><i class="bi bi-reply-fill label-icon" aria-hidden="true"></i>Response</label>
+            <div class="textarea-label-row">
+              <label class="form-label fw-semibold mb-0"><i class="bi bi-reply-fill label-icon" aria-hidden="true"></i>Response</label>
+              <div class="textarea-action-btns">
+                <button class="textarea-action-btn" title="Copy to clipboard" data-action="copy"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+              </div>
+            </div>
             <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.answer || '')}</textarea>
           </div>
           <div class="history-preview-field">
-            <label class="form-label fw-semibold mb-1"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
+            <div class="textarea-label-row">
+              <label class="form-label fw-semibold mb-0"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
+              <div class="textarea-action-btns">
+                <button class="textarea-action-btn" title="Copy to clipboard" data-action="copy"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+                <button class="textarea-action-btn" title="Reuse as system prompt" data-action="reuse" data-target="systemPrompt"><i class="bi bi-arrow-return-left" aria-hidden="true"></i></button>
+              </div>
+            </div>
             <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.systemPrompt || '')}</textarea>
           </div>
         </div>
@@ -629,6 +682,33 @@ function updateHistoryActionButtons() {
   el.clearBtn.disabled = !hasHistory;
   el.headerExportBtn.disabled = !hasHistory;
   el.headerClearBtn.disabled = !hasHistory;
+  updateSelectAllCheckbox();
+}
+
+function updateSelectAllCheckbox() {
+  const total = state.history.length;
+  const selected = state.compareSelection.size;
+  el.historySelectAll.disabled = total === 0;
+  if (selected === 0) {
+    el.historySelectAll.checked = false;
+    el.historySelectAll.indeterminate = false;
+  } else if (selected >= total) {
+    el.historySelectAll.checked = true;
+    el.historySelectAll.indeterminate = false;
+  } else {
+    el.historySelectAll.checked = false;
+    el.historySelectAll.indeterminate = true;
+  }
+}
+
+function onHistorySelectAll() {
+  if (el.historySelectAll.checked) {
+    state.history.forEach((item) => state.compareSelection.add(item.id));
+  } else {
+    state.compareSelection.clear();
+  }
+  updateCompareBtn();
+  renderHistory();
 }
 
 function loadHistory() {
@@ -723,6 +803,26 @@ function clearHistory() {
   setStatus('History cleared.', 'success');
 }
 
+function openDeleteSelectedConfirmModal() {
+  const count = state.compareSelection.size;
+  openConfirmModal({
+    type: 'deleteSelected',
+    title: 'Remove selected',
+    message: `Do you want to delete ${count} selected history entr${count === 1 ? 'y' : 'ies'}?`,
+    actionLabel: 'Remove',
+  });
+}
+
+function confirmDeleteSelectedEntries() {
+  state.history = state.history.filter((item) => !state.compareSelection.has(item.id));
+  state.compareSelection.clear();
+  persistHistory();
+  renderHistory();
+  updateCompareBtn();
+  closeConfirmModal();
+  setStatus('Selected entries deleted.', 'success');
+}
+
 function openClearConfirmModal() {
   state.pendingDeleteEntryId = null;
   openConfirmModal({
@@ -734,15 +834,37 @@ function openClearConfirmModal() {
 }
 
 function onHistoryClick(event) {
+  const textareaActionBtn = event.target.closest('.textarea-action-btn');
+  if (textareaActionBtn) {
+    const field = textareaActionBtn.closest('.history-preview-field');
+    const textarea = field?.querySelector('textarea');
+    if (!textarea) return;
+    const action = textareaActionBtn.dataset.action;
+    if (action === 'copy') {
+      navigator.clipboard.writeText(textarea.value).then(() => {
+        const icon = textareaActionBtn.querySelector('i');
+        icon.className = 'bi bi-clipboard-check';
+        textareaActionBtn.classList.add('copied');
+        setTimeout(() => {
+          icon.className = 'bi bi-clipboard';
+          textareaActionBtn.classList.remove('copied');
+        }, 1500);
+      });
+    } else if (action === 'reuse') {
+      const target = document.getElementById(textareaActionBtn.dataset.target);
+      if (target) {
+        target.value = textarea.value;
+        target.dispatchEvent(new Event('input'));
+      }
+    }
+    return;
+  }
+
   const checkbox = event.target.closest('.history-compare-cb');
   if (checkbox) {
     const entryId = checkbox.dataset.entryId;
     if (checkbox.checked) {
-      if (state.compareSelection.size < MAX_COMPARE) {
-        state.compareSelection.add(entryId);
-      } else {
-        checkbox.checked = false;
-      }
+      state.compareSelection.add(entryId);
     } else {
       state.compareSelection.delete(entryId);
     }
@@ -1153,6 +1275,10 @@ function confirmModalAction() {
     confirmDeleteHistoryEntry();
     return;
   }
+  if (state.pendingConfirmAction === 'deleteSelected') {
+    confirmDeleteSelectedEntries();
+    return;
+  }
   if (state.pendingConfirmAction === 'clearHistory') {
     closeConfirmModal();
     clearHistory();
@@ -1224,7 +1350,10 @@ function setHistoryTab(tabName) {
 function updateCompareBtn() {
   const count = state.compareSelection.size;
   el.compareBtn.disabled = count < 2;
-  el.compareBtn.innerHTML = `<i class="bi bi-bar-chart-line-fill me-2" aria-hidden="true"></i>Compare (${count}/${MAX_COMPARE})`;
+  const label = count > MAX_COMPARE ? `${count} → ${MAX_COMPARE}` : String(count);
+  el.compareBtn.innerHTML = `<i class="bi bi-bar-chart-line-fill me-2" aria-hidden="true"></i>Compare (${label})`;
+  el.deleteSelectedBtn.disabled = count === 0;
+  updateSelectAllCheckbox();
 }
 
 function getCompareMetrics() {
@@ -1254,7 +1383,9 @@ function getCompareMetrics() {
 function openCompareModal() {
   const entries = [...state.compareSelection]
     .map((id) => state.history.find((item) => item.id === id))
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, MAX_COMPARE);
 
   if (entries.length < 2) {
     return;

@@ -135,15 +135,32 @@
               <div id="responseContent">
                 <div class="history-preview-grid mb-3">
                   <div class="history-preview-field">
-                    <label class="form-label fw-semibold mb-1"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+                    <div class="textarea-label-row">
+                      <label class="form-label fw-semibold mb-0"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+                      <div class="textarea-action-btns">
+                        <button class="textarea-action-btn" title="Copy to clipboard" data-copy="responseMessagePreview"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+                        <button class="textarea-action-btn" title="Reuse as message" data-reuse="responseMessagePreview" data-target="message"><i class="bi bi-arrow-return-left" aria-hidden="true"></i></button>
+                      </div>
+                    </div>
                     <textarea id="responseMessagePreview" class="form-control history-preview-textarea" rows="4" readonly></textarea>
                   </div>
                   <div class="history-preview-field">
-                    <label class="form-label fw-semibold mb-1"><i class="bi bi-reply-fill label-icon" aria-hidden="true"></i>Response</label>
+                    <div class="textarea-label-row">
+                      <label class="form-label fw-semibold mb-0"><i class="bi bi-reply-fill label-icon" aria-hidden="true"></i>Response</label>
+                      <div class="textarea-action-btns">
+                        <button class="textarea-action-btn" title="Copy to clipboard" data-copy="answer"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+                      </div>
+                    </div>
                     <textarea id="answer" class="form-control history-preview-textarea" rows="4" readonly></textarea>
                   </div>
                   <div class="history-preview-field">
-                    <label class="form-label fw-semibold mb-1"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
+                    <div class="textarea-label-row">
+                      <label class="form-label fw-semibold mb-0"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
+                      <div class="textarea-action-btns">
+                        <button class="textarea-action-btn" title="Copy to clipboard" data-copy="responseSystemPromptPreview"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+                        <button class="textarea-action-btn" title="Reuse as system prompt" data-reuse="responseSystemPromptPreview" data-target="systemPrompt"><i class="bi bi-arrow-return-left" aria-hidden="true"></i></button>
+                      </div>
+                    </div>
                     <textarea id="responseSystemPromptPreview" class="form-control history-preview-textarea" rows="4" readonly></textarea>
                   </div>
                 </div>
@@ -216,17 +233,26 @@
               <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
                 <h2 class="h4 mb-0">Request History</h2>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
-                  <button id="historyViewToggleBtn" class="btn btn-sm btn-outline-secondary" title="Switch to compact view">
-                    <i class="bi bi-list-ul" aria-hidden="true"></i>
-                  </button>
+                  <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="historySelectAll" title="Select / deselect all for comparison" disabled>
+                    <label class="form-check-label text-body-secondary small" for="historySelectAll">All</label>
+                  </div>
                   <button id="compareBtn" class="btn btn-sm btn-outline-secondary compare-btn" disabled>
                     <i class="bi bi-bar-chart-line-fill me-2" aria-hidden="true"></i>Compare (0/10)
                   </button>
+                  <button id="deleteSelectedBtn" class="btn btn-sm btn-outline-secondary delete-selected-btn" disabled>
+                    <i class="bi bi-trash3 me-2" aria-hidden="true"></i>Remove selected
+                  </button>
+                  <div class="vr"></div>
                   <button id="exportBtn" class="btn btn-sm btn-outline-primary export-btn">
                     <i class="bi bi-file-earmark-spreadsheet-fill me-2" aria-hidden="true"></i>Export CSV
                   </button>
                   <button id="clearBtn" class="btn btn-sm btn-outline-danger clear-btn">
                     <i class="bi bi-trash3-fill me-2" aria-hidden="true"></i>Clear History
+                  </button>
+                  <div class="vr"></div>
+                  <button id="historyViewToggleBtn" class="btn btn-sm btn-outline-secondary" title="Switch to compact view">
+                    <i class="bi bi-list-ul" aria-hidden="true"></i>
                   </button>
                 </div>
               </div>
@@ -441,15 +467,32 @@
         </section>
 
         <section class="history-tab-panel hidden" data-history-panel="prompt">
-          <label class="form-label fw-semibold mb-1" for="historyDetailsSystemPrompt">System Prompt</label>
+          <div class="textarea-label-row">
+            <label class="form-label fw-semibold mb-0" for="historyDetailsSystemPrompt">System Prompt</label>
+            <div class="textarea-action-btns">
+              <button class="textarea-action-btn" title="Copy to clipboard" data-copy="historyDetailsSystemPrompt"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+              <button class="textarea-action-btn" title="Reuse as system prompt" data-reuse="historyDetailsSystemPrompt" data-target="systemPrompt"><i class="bi bi-arrow-return-left" aria-hidden="true"></i></button>
+            </div>
+          </div>
           <textarea id="historyDetailsSystemPrompt" class="history-details-content form-control mb-2" rows="6" readonly></textarea>
 
-          <label class="form-label fw-semibold mb-1" for="historyDetailsMessage">Message</label>
+          <div class="textarea-label-row">
+            <label class="form-label fw-semibold mb-0" for="historyDetailsMessage">Message</label>
+            <div class="textarea-action-btns">
+              <button class="textarea-action-btn" title="Copy to clipboard" data-copy="historyDetailsMessage"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+              <button class="textarea-action-btn" title="Reuse as message" data-reuse="historyDetailsMessage" data-target="message"><i class="bi bi-arrow-return-left" aria-hidden="true"></i></button>
+            </div>
+          </div>
           <textarea id="historyDetailsMessage" class="history-details-content form-control mb-0" rows="6" readonly></textarea>
         </section>
 
         <section class="history-tab-panel history-tab-panel-fill hidden" data-history-panel="response">
-          <label class="form-label fw-semibold mb-1" for="historyDetailsAnswer">Answer</label>
+          <div class="textarea-label-row">
+            <label class="form-label fw-semibold mb-0" for="historyDetailsAnswer">Answer</label>
+            <div class="textarea-action-btns">
+              <button class="textarea-action-btn" title="Copy to clipboard" data-copy="historyDetailsAnswer"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
+            </div>
+          </div>
           <textarea id="historyDetailsAnswer" class="history-details-content form-control mb-0" rows="10" readonly></textarea>
         </section>
 

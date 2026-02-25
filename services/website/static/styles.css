@@ -206,6 +206,25 @@
   cursor: not-allowed;
 }
 
+.delete-selected-btn {
+  border-color: #f0a3a3;
+  color: #b42323;
+}
+
+.delete-selected-btn:hover {
+  background: #fdecec;
+  border-color: #e07f7f;
+  color: #8f1a1a;
+}
+
+.delete-selected-btn:disabled,
+.delete-selected-btn:disabled:hover {
+  background: #f3f5f7;
+  border-color: #d5dbe2;
+  color: #9aa7b5;
+  cursor: not-allowed;
+}
+
 .actions .btn {
   min-width: 0;
 }
@@ -328,6 +347,39 @@
   resize: vertical;
   min-height: 96px;
   max-height: 220px;
+}
+
+.textarea-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
+.textarea-action-btns {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.textarea-action-btn {
+  background: none;
+  border: none;
+  padding: 0.1rem 0.25rem;
+  color: #718096;
+  font-size: 0.78rem;
+  line-height: 1;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.textarea-action-btn:hover {
+  color: #2d3748;
+  background-color: #e2e8f0;
+}
+
+.textarea-action-btn.copied {
+  color: #38a169;
 }
 
 .history-details-btn,
