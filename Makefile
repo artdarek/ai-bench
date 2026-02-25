@@ -62,8 +62,7 @@ deploy-codebase:
 		"sudo mkdir -p '$(REMOTE_WWW_PATH)' && \
 		sudo rm -rf '$(REMOTE_WWW_PATH)/services/api' '$(REMOTE_WWW_PATH)/services/website' '$(REMOTE_WWW_PATH)/config' && \
 		sudo cp -R '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)/.' '$(REMOTE_WWW_PATH)/' && \
-		sudo mkdir -p '$(REMOTE_WWW_PATH)/services/storage/data/snapshots' && \
-		sudo chmod 0777 '$(REMOTE_WWW_PATH)/services/storage/data/snapshots'"
+		sudo chmod 0777 '$(REMOTE_WWW_PATH)/services/storage/data'"
 
 ## Remove temporary deploy folder on remote server
 deploy-clean:

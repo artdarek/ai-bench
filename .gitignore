@@ -3,4 +3,5 @@ __pycache__/
 *.pyc
 .env
 .claude/
-services/storage/data/snapshots/
+services/storage/data/*
+!services/storage/data/.gitkeep
