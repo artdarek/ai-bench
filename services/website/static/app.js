@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'aibench_history_v1';
 const UI_PREFS_KEY = 'aibench_ui_prefs_v1';
+const SNAPSHOTS_LIST_KEY = 'aibench_snapshots_list_v1';
 const STORAGE_KEYS = {
   llmProvider: 'llm_provider',
   llmModel: 'llm_model',
@@ -43,6 +44,12 @@ const el = {
   keepMessageAfterSend: document.getElementById('keepMessageAfterSend'),
   sendBtn: document.getElementById('sendBtn'),
   headerSaveBtn: document.getElementById('headerSaveBtn'),
+  headerLoadSnapshotBtn: document.getElementById('headerLoadSnapshotBtn'),
+  snapshotsListModal: document.getElementById('snapshotsListModal'),
+  snapshotsListModalCloseBtn: document.getElementById('snapshotsListModalCloseBtn'),
+  snapshotsListBody: document.getElementById('snapshotsListBody'),
+  snapshotsListClearBtn: document.getElementById('snapshotsListClearBtn'),
+  snapshotsListCloseFooterBtn: document.getElementById('snapshotsListCloseFooterBtn'),
   headerExportBtn: document.getElementById('headerExportBtn'),
   headerClearBtn: document.getElementById('headerClearBtn'),
   headerSettingsBtn: document.getElementById('headerSettingsBtn'),
@@ -184,6 +191,7 @@ async function saveSnapshot() {
     history.replaceState(null, '', url.toString());
     state.snapshotSaved = true;
     updateSaveBtn();
+    saveSnapshotToList(payload.id, url.toString(), state.history.length);
     try {
       await navigator.clipboard.writeText(url.toString());
       setStatus('History saved. URL copied to clipboard.', 'success');
@@ -259,6 +267,32 @@ async function init() {
   document.addEventListener('keydown', onGlobalKeyDown);
   el.sendBtn.addEventListener('click', onSend);
   el.headerSaveBtn.addEventListener('click', saveSnapshot);
+  el.headerLoadSnapshotBtn.addEventListener('click', openSnapshotsListModal);
+  el.snapshotsListModalCloseBtn.addEventListener('click', closeSnapshotsListModal);
+  el.snapshotsListCloseFooterBtn.addEventListener('click', closeSnapshotsListModal);
+  el.snapshotsListClearBtn.addEventListener('click', clearSnapshotsList);
+  el.snapshotsListModal.addEventListener('click', (e) => {
+    if (e.target === el.snapshotsListModal || e.target.closest('.history-modal-backdrop')) {
+      closeSnapshotsListModal();
+    }
+  });
+  el.snapshotsListBody.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.snapshots-list-copy-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const url = btn.dataset.url;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      return;
+    }
+    const icon = btn.querySelector('i');
+    icon.className = 'bi bi-check-lg snapshots-copy-ok';
+    setTimeout(() => {
+      icon.className = 'bi bi-clipboard';
+    }, 1500);
+  });
   el.headerExportBtn.addEventListener('click', exportCsv);
   el.headerClearBtn.addEventListener('click', openClearConfirmModal);
   el.headerSettingsBtn.addEventListener('click', openSettingsModal);
@@ -469,6 +503,44 @@ function openSettingsModal() {
 
 function closeSettingsModal() {
   el.settingsModal.classList.add('hidden');
+}
+
+function openSnapshotsListModal() {
+  const list = loadSnapshotsList();
+  if (list.length === 0) {
+    el.snapshotsListBody.innerHTML =
+      '<p class="text-body-secondary text-center py-3 mb-0">No saved snapshots yet.</p>';
+  } else {
+    el.snapshotsListBody.innerHTML = list
+      .map(
+        (s) => `
+        <a href="${escapeHtml(s.url)}" class="snapshots-list-item">
+          <span class="snapshots-list-info">
+            <span class="snapshots-list-date">${new Date(s.createdAt).toLocaleString()}</span>
+            <span class="snapshots-list-url">${escapeHtml(s.url)}</span>
+          </span>
+          <span class="snapshots-list-right">
+            <span class="snapshots-list-count">${s.count} request${s.count !== 1 ? 's' : ''}</span>
+            <span class="snapshots-list-divider" aria-hidden="true"></span>
+            <button class="snapshots-list-copy-btn" data-url="${escapeHtml(s.url)}" type="button" aria-label="Copy URL" title="Copy URL">
+              <i class="bi bi-clipboard" aria-hidden="true"></i>
+            </button>
+          </span>
+        </a>`
+      )
+      .join('');
+  }
+  el.snapshotsListModal.classList.remove('hidden');
+}
+
+function closeSnapshotsListModal() {
+  el.snapshotsListModal.classList.add('hidden');
+}
+
+function clearSnapshotsList() {
+  localStorage.removeItem(SNAPSHOTS_LIST_KEY);
+  el.snapshotsListBody.innerHTML =
+    '<p class="text-body-secondary text-center py-3 mb-0">No saved snapshots yet.</p>';
 }
 
 function onSettingsProviderChange() {
@@ -832,6 +904,20 @@ function loadUiPrefs() {
 
 function persistUiPrefs() {
   localStorage.setItem(UI_PREFS_KEY, JSON.stringify(state.uiPrefs || {}));
+}
+
+function loadSnapshotsList() {
+  try {
+    return JSON.parse(localStorage.getItem(SNAPSHOTS_LIST_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSnapshotToList(id, url, count) {
+  const list = loadSnapshotsList();
+  list.unshift({ id, url, createdAt: new Date().toISOString(), count });
+  localStorage.setItem(SNAPSHOTS_LIST_KEY, JSON.stringify(list));
 }
 
 function applyUiPreferences() {
@@ -1274,6 +1360,10 @@ function onGlobalKeyDown(event) {
   }
   if (event.key === 'Escape' && !el.historyConfirmModal.classList.contains('hidden')) {
     closeConfirmModal();
+    return;
+  }
+  if (event.key === 'Escape' && !el.snapshotsListModal.classList.contains('hidden')) {
+    closeSnapshotsListModal();
   }
 }
 
