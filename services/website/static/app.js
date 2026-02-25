@@ -27,6 +27,7 @@ const state = {
   chartInstance2: null,
   chartInstance3: null,
   chartInstance4: null,
+  snapshotSaved: false,
 };
 
 const el = {
@@ -41,6 +42,7 @@ const el = {
   message: document.getElementById('message'),
   keepMessageAfterSend: document.getElementById('keepMessageAfterSend'),
   sendBtn: document.getElementById('sendBtn'),
+  headerSaveBtn: document.getElementById('headerSaveBtn'),
   headerExportBtn: document.getElementById('headerExportBtn'),
   headerClearBtn: document.getElementById('headerClearBtn'),
   headerSettingsBtn: document.getElementById('headerSettingsBtn'),
@@ -156,6 +158,44 @@ const el = {
 
 init().catch((error) => setStatus(`Initialization error: ${error.message}`, 'error'));
 
+function updateSaveBtn() {
+  const disabled = state.snapshotSaved || state.history.length === 0;
+  el.headerSaveBtn.disabled = disabled;
+  el.headerSaveBtn.classList.toggle('btn-icon-disabled', disabled);
+  if (!state.snapshotSaved && new URLSearchParams(location.search).has('snapshot')) {
+    const cleanUrl = new URL(location.href);
+    cleanUrl.searchParams.delete('snapshot');
+    history.replaceState(null, '', cleanUrl.toString());
+  }
+}
+
+async function saveSnapshot() {
+  try {
+    el.headerSaveBtn.disabled = true;
+    const response = await fetch('/api/snapshots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history: state.history }),
+    });
+    const payload = await readApiResponse(response);
+    if (!response.ok) throw new Error(payload?.detail || 'Save failed.');
+    const url = new URL(location.href);
+    url.searchParams.set('snapshot', payload.id);
+    history.replaceState(null, '', url.toString());
+    state.snapshotSaved = true;
+    updateSaveBtn();
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      setStatus('History saved. URL copied to clipboard.', 'success');
+    } catch {
+      setStatus('History saved. Share this URL.', 'success');
+    }
+  } catch (err) {
+    setStatus(`Save failed: ${err.message}`, 'error');
+    updateSaveBtn();
+  }
+}
+
 async function init() {
   const response = await fetch('/api/config');
   const payload = await readApiResponse(response);
@@ -164,6 +204,26 @@ async function init() {
   }
 
   state.config = payload;
+
+  // Load snapshot from URL (if present)
+  const snapshotId = new URLSearchParams(location.search).get('snapshot');
+  if (snapshotId) {
+    const cleanUrl = new URL(location.href);
+    cleanUrl.searchParams.delete('snapshot');
+    history.replaceState(null, '', cleanUrl.toString());
+
+    const snapResp = await fetch(`/api/snapshots/${encodeURIComponent(snapshotId)}`);
+    if (snapResp.ok) {
+      const snapData = await snapResp.json();
+      if (Array.isArray(snapData.history)) {
+        state.history = snapData.history;
+        state.snapshotSaved = false;
+      }
+    } else {
+      setStatus('Snapshot not found or expired.', 'warning');
+    }
+  }
+
   setupProviderOptions();
   applyDefaultPrompts();
   applyUiPreferences();
@@ -198,6 +258,7 @@ async function init() {
   el.compareExportBtn.addEventListener('click', exportCompareCsv);
   document.addEventListener('keydown', onGlobalKeyDown);
   el.sendBtn.addEventListener('click', onSend);
+  el.headerSaveBtn.addEventListener('click', saveSnapshot);
   el.headerExportBtn.addEventListener('click', exportCsv);
   el.headerClearBtn.addEventListener('click', openClearConfirmModal);
   el.headerSettingsBtn.addEventListener('click', openSettingsModal);
@@ -221,6 +282,7 @@ async function init() {
   resizeMessageInput();
   updateSettingsModalState();
   updateKeyIndicator();
+  updateSaveBtn();
 }
 
 function onTextareaActionCopy(e) {
@@ -560,6 +622,8 @@ async function onSend() {
 
     state.history = [...state.history, historyEntry].slice(-MAX_HISTORY);
     persistHistory();
+    state.snapshotSaved = false;
+    updateSaveBtn();
     renderHistory();
     if (!el.keepMessageAfterSend?.checked) {
       el.message.value = '';
@@ -835,6 +899,8 @@ function clearHistory() {
   state.history = [];
   state.compareSelection.clear();
   persistHistory();
+  state.snapshotSaved = false;
+  updateSaveBtn();
   renderHistory();
   updateCompareBtn();
   setStatus('History cleared.', 'success');
@@ -854,6 +920,8 @@ function confirmDeleteSelectedEntries() {
   state.history = state.history.filter((item) => !state.compareSelection.has(item.id));
   state.compareSelection.clear();
   persistHistory();
+  state.snapshotSaved = false;
+  updateSaveBtn();
   renderHistory();
   updateCompareBtn();
   closeConfirmModal();
@@ -1364,6 +1432,8 @@ function confirmDeleteHistoryEntry() {
   state.compareSelection.delete(state.pendingDeleteEntryId);
   state.history = state.history.filter((item) => item.id !== state.pendingDeleteEntryId);
   persistHistory();
+  state.snapshotSaved = false;
+  updateSaveBtn();
   renderHistory();
   updateCompareBtn();
   closeConfirmModal();

@@ -46,6 +46,13 @@
   line-height: 1;
 }
 
+.btn-icon:disabled,
+.btn-icon.btn-icon-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn-icon-clear:hover {
   background: #fdecec;
   border-color: #e6aaaa;

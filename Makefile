@@ -60,8 +60,10 @@ deploy-codebase:
 		"$(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)"
 	ssh -t -p "$(REMOTE_PORT)" "$(REMOTE_USER)@$(REMOTE_HOST)" \
 		"sudo mkdir -p '$(REMOTE_WWW_PATH)' && \
-		sudo rm -rf '$(REMOTE_WWW_PATH)/services' '$(REMOTE_WWW_PATH)/config' && \
-		sudo cp -R '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)/.' '$(REMOTE_WWW_PATH)/'"
+		sudo rm -rf '$(REMOTE_WWW_PATH)/services/api' '$(REMOTE_WWW_PATH)/services/website' '$(REMOTE_WWW_PATH)/config' && \
+		sudo cp -R '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)/.' '$(REMOTE_WWW_PATH)/' && \
+		sudo mkdir -p '$(REMOTE_WWW_PATH)/services/storage/data/snapshots' && \
+		sudo chmod 0777 '$(REMOTE_WWW_PATH)/services/storage/data/snapshots'"
 
 ## Remove temporary deploy folder on remote server
 deploy-clean:

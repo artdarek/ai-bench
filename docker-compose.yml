@@ -20,4 +20,5 @@ services:
     volumes:
       - ./config:/app/config:ro
       - ./services/website:/app/services/website:ro
+      - ./services/storage/data/snapshots:/app/data/snapshots
     restart: unless-stopped

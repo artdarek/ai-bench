@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -19,8 +20,14 @@ _BASE_CANDIDATES = [
 
 BASE_DIR = next((candidate for candidate in _BASE_CANDIDATES if (candidate / 'config' / 'providers.json').exists()), _HERE)
 CONFIG_PATH = BASE_DIR / 'config' / 'providers.json'
+SNAPSHOTS_DIR = BASE_DIR / 'data' / 'snapshots'
+SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR = BASE_DIR / 'services' / 'website'
 load_dotenv(BASE_DIR / '.env')
+
+
+class SnapshotRequest(BaseModel):
+    history: list[dict] = Field(default_factory=list)
 
 
 class ChatRequest(BaseModel):
@@ -231,6 +238,28 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
         'usage': usage.model_dump(),
         'cost': cost.model_dump(),
     }
+
+
+@app.post('/api/snapshots')
+def create_snapshot(payload: SnapshotRequest) -> dict[str, str]:
+    import datetime
+    snapshot_id = str(uuid.uuid4())
+    file_path = SNAPSHOTS_DIR / f'{snapshot_id}.json'
+    data = {'id': snapshot_id, 'createdAt': datetime.datetime.utcnow().isoformat() + 'Z', 'history': payload.history}
+    file_path.write_text(json.dumps(data), encoding='utf-8')
+    return {'id': snapshot_id}
+
+
+@app.get('/api/snapshots/{snapshot_id}')
+def get_snapshot(snapshot_id: str) -> dict:
+    try:
+        uuid.UUID(snapshot_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail='Invalid snapshot ID.')
+    file_path = SNAPSHOTS_DIR / f'{snapshot_id}.json'
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail='Snapshot not found.')
+    return json.loads(file_path.read_text(encoding='utf-8'))
 
 
 @app.get('/')
