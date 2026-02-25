@@ -110,6 +110,7 @@ const el = {
   historyViewToggleBtn: document.getElementById('historyViewToggleBtn'),
   compareBtn: document.getElementById('compareBtn'),
   deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
+  exportSelectedBtn: document.getElementById('exportSelectedBtn'),
   compareModal: document.getElementById('compareModal'),
   compareCloseBtn: document.getElementById('compareCloseBtn'),
   compareTableHead: document.getElementById('compareTableHead'),
@@ -181,6 +182,7 @@ async function init() {
   el.chartSelect.addEventListener('change', renderChart);
   el.compareBtn.addEventListener('click', openCompareModal);
   el.deleteSelectedBtn.addEventListener('click', openDeleteSelectedConfirmModal);
+  el.exportSelectedBtn.addEventListener('click', exportSelectedCsv);
   el.compareCloseBtn.addEventListener('click', closeCompareModal);
   el.compareModal.addEventListener('click', onCompareModalClick);
   el.compareExportBtn.addEventListener('click', exportCompareCsv);
@@ -918,12 +920,7 @@ function onHistoryClick(event) {
   }
 }
 
-function exportCsv() {
-  if (!state.history.length) {
-    setStatus('No data to export.', 'warning');
-    return;
-  }
-
+function buildCsvContent(items) {
   const header = [
     'id',
     'createdAt',
@@ -947,7 +944,7 @@ function exportCsv() {
     'answer',
   ];
 
-  const rows = state.history.map((item) => [
+  const rows = items.map((item) => [
     item.id,
     item.createdAt,
     item.provider,
@@ -970,20 +967,42 @@ function exportCsv() {
     item.answer,
   ]);
 
-  const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  return [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
+}
+
+function downloadCsv(content, filename) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  const now = new Date();
-  const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-
   link.href = url;
-  link.download = `aibench-report-${stamp}.csv`;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
 
+function makeCsvStamp() {
+  const now = new Date();
+  return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+}
+
+function exportCsv() {
+  if (!state.history.length) {
+    setStatus('No data to export.', 'warning');
+    return;
+  }
+  downloadCsv(buildCsvContent(state.history), `aibench-report-${makeCsvStamp()}.csv`);
+  setStatus('CSV downloaded.', 'success');
+}
+
+function exportSelectedCsv() {
+  const items = state.history.filter((item) => state.compareSelection.has(item.id));
+  if (!items.length) {
+    setStatus('No selected entries to export.', 'warning');
+    return;
+  }
+  downloadCsv(buildCsvContent(items), `aibench-report-selected-${makeCsvStamp()}.csv`);
   setStatus('CSV downloaded.', 'success');
 }
 
@@ -1353,6 +1372,7 @@ function updateCompareBtn() {
   const label = count > MAX_COMPARE ? `${count} → ${MAX_COMPARE}` : String(count);
   el.compareBtn.innerHTML = `<i class="bi bi-bar-chart-line-fill me-2" aria-hidden="true"></i>Compare (${label})`;
   el.deleteSelectedBtn.disabled = count === 0;
+  el.exportSelectedBtn.disabled = count === 0;
   updateSelectAllCheckbox();
 }
 

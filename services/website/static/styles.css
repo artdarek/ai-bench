@@ -206,6 +206,25 @@
   cursor: not-allowed;
 }
 
+.export-selected-btn {
+  border-color: #8bcf9d;
+  color: #1f7a39;
+}
+
+.export-selected-btn:hover {
+  background: #ebf8ef;
+  border-color: #68b97d;
+  color: #16622d;
+}
+
+.export-selected-btn:disabled,
+.export-selected-btn:disabled:hover {
+  background: #f3f5f7;
+  border-color: #d5dbe2;
+  color: #9aa7b5;
+  cursor: not-allowed;
+}
+
 .delete-selected-btn {
   border-color: #f0a3a3;
   color: #b42323;
