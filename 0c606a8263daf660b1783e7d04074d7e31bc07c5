@@ -1,0 +1,23 @@
+.gitignore
+  8cef6a6accb20000 6-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "0c606a8263daf660b1783e7d04074d7e31bc07c5",
+  "prompts": {
+    "8cef6a6accb20000": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e46021a-bf5c-4229-90b6-d33794ec9ab8",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
