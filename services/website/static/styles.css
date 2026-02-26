@@ -664,8 +664,6 @@
   gap: 1rem;
   padding: 0.625rem 0.75rem;
   border-radius: 6px;
-  text-decoration: none;
-  color: inherit;
   border: 1px solid transparent;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -673,7 +671,6 @@
 .snapshots-list-item:hover {
   background: var(--bs-tertiary-bg);
   border-color: var(--bs-border-color);
-  color: inherit;
 }
 
 .snapshots-list-info {
@@ -684,7 +681,60 @@
 }
 
 .snapshots-list-date {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--bs-secondary-color);
+}
+
+.snapshots-list-name {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.snapshots-list-rename-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--bs-tertiary-color);
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.snapshots-list-item:hover .snapshots-list-rename-btn {
+  opacity: 1;
+}
+
+.snapshots-list-rename-btn:hover {
+  color: var(--bs-body-color);
+}
+
+.snapshots-list-name-input {
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-bottom: 1px solid var(--bs-primary);
+  background: transparent;
+  outline: none;
+  padding: 0 0 1px;
+  color: inherit;
+  width: 16rem;
+  max-width: 100%;
+}
+
+.snapshots-list-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .snapshots-list-url {
@@ -702,10 +752,8 @@
   flex-shrink: 0;
 }
 
-.snapshots-list-count {
-  font-size: 0.8rem;
-  color: var(--bs-secondary-color);
-  white-space: nowrap;
+.snapshots-list-count-icon {
+  margin-left: 0.25rem;
 }
 
 .snapshots-list-divider {
@@ -716,7 +764,9 @@
   flex-shrink: 0;
 }
 
-.snapshots-list-copy-btn {
+.snapshots-list-copy-btn,
+.snapshots-list-delete-btn,
+.snapshots-list-open-btn {
   position: relative;
   background: #fff;
   border: 1px solid #d5dce4;
@@ -734,10 +784,17 @@
   flex-shrink: 0;
 }
 
-.snapshots-list-copy-btn:hover {
+.snapshots-list-copy-btn:hover,
+.snapshots-list-open-btn:hover {
   background: #f2f5f8;
   border-color: #c2ccd8;
   color: #405062;
+}
+
+.snapshots-list-delete-btn:hover {
+  background: #f2f5f8;
+  border-color: #c2ccd8;
+  color: #dc2626;
 }
 
 .snapshots-copy-ok {

@@ -277,6 +277,52 @@ async function init() {
     }
   });
   el.snapshotsListBody.addEventListener('click', async (e) => {
+    const deleteBtn = e.target.closest('.snapshots-list-delete-btn');
+    if (deleteBtn) {
+      const id = deleteBtn.dataset.id;
+      const updated = loadSnapshotsList().filter(s => s.id !== id);
+      localStorage.setItem(SNAPSHOTS_LIST_KEY, JSON.stringify(updated));
+      openSnapshotsListModal();
+      return;
+    }
+
+    const openBtn = e.target.closest('.snapshots-list-open-btn');
+    if (openBtn) {
+      window.open(openBtn.dataset.url, '_blank', 'noopener');
+      return;
+    }
+
+    const renameBtn = e.target.closest('.snapshots-list-rename-btn');
+    if (renameBtn) {
+      const nameSpan = renameBtn.closest('.snapshots-list-name');
+      const id = renameBtn.dataset.id;
+      const currentName = renameBtn.dataset.name;
+      nameSpan.innerHTML = '<input class="snapshots-list-name-input" type="text" maxlength="100" autocomplete="off">';
+      const input = nameSpan.querySelector('input');
+      input.value = currentName;
+      input.focus();
+      input.select();
+      let committed = false;
+      const commit = () => {
+        if (committed) return;
+        committed = true;
+        const newName = input.value.trim() || currentName;
+        const list = loadSnapshotsList();
+        const entry = list.find(s => s.id === id);
+        if (entry) {
+          entry.name = newName;
+          localStorage.setItem(SNAPSHOTS_LIST_KEY, JSON.stringify(list));
+        }
+        openSnapshotsListModal();
+      };
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+        if (ev.key === 'Escape') { committed = true; openSnapshotsListModal(); }
+      });
+      input.addEventListener('blur', commit);
+      return;
+    }
+
     const btn = e.target.closest('.snapshots-list-copy-btn');
     if (!btn) return;
     e.preventDefault();
@@ -290,7 +336,7 @@ async function init() {
     const icon = btn.querySelector('i');
     icon.className = 'bi bi-check-lg snapshots-copy-ok';
     setTimeout(() => {
-      icon.className = 'bi bi-clipboard';
+      icon.className = 'bi bi-share';
     }, 1500);
   });
   el.headerExportBtn.addEventListener('click', exportCsv);
@@ -514,19 +560,32 @@ function openSnapshotsListModal() {
     el.snapshotsListBody.innerHTML = list
       .map(
         (s) => `
-        <a href="${escapeHtml(s.url)}" class="snapshots-list-item">
+        <div class="snapshots-list-item">
           <span class="snapshots-list-info">
-            <span class="snapshots-list-date">${new Date(s.createdAt).toLocaleString()}</span>
-            <span class="snapshots-list-url">${escapeHtml(s.url)}</span>
+            <span class="snapshots-list-date"><i class="bi bi-clock" aria-hidden="true"></i>${new Date(s.createdAt).toLocaleString()}<i class="bi bi-layers snapshots-list-count-icon" aria-hidden="true"></i>${s.count} request${s.count !== 1 ? 's' : ''}</span>
+            <span class="snapshots-list-name">
+              <span class="snapshots-list-name-text">${escapeHtml(s.name || `Snapshot ${snapshotTimestamp(new Date(s.createdAt))}`)}</span>
+              <button class="snapshots-list-rename-btn" data-id="${escapeHtml(s.id)}" data-name="${escapeHtml(s.name || `Snapshot ${snapshotTimestamp(new Date(s.createdAt))}`)}" type="button" aria-label="Rename" title="Rename">
+                <i class="bi bi-pencil" aria-hidden="true"></i>
+              </button>
+            </span>
+            <span class="snapshots-list-meta">
+              <span class="snapshots-list-url">${escapeHtml(s.url)}</span>
+            </span>
           </span>
           <span class="snapshots-list-right">
-            <span class="snapshots-list-count">${s.count} request${s.count !== 1 ? 's' : ''}</span>
+            <button class="snapshots-list-delete-btn" data-id="${escapeHtml(s.id)}" type="button" aria-label="Delete" title="Remove from list">
+              <i class="bi bi-trash3" aria-hidden="true"></i>
+            </button>
             <span class="snapshots-list-divider" aria-hidden="true"></span>
             <button class="snapshots-list-copy-btn" data-url="${escapeHtml(s.url)}" type="button" aria-label="Copy URL" title="Copy URL">
-              <i class="bi bi-clipboard" aria-hidden="true"></i>
+              <i class="bi bi-share" aria-hidden="true"></i>
+            </button>
+            <button class="snapshots-list-open-btn" data-url="${escapeHtml(s.url)}" type="button" aria-label="Open snapshot" title="Open snapshot">
+              <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
             </button>
           </span>
-        </a>`
+        </div>`
       )
       .join('');
   }
@@ -914,9 +973,15 @@ function loadSnapshotsList() {
   }
 }
 
+function snapshotTimestamp(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
 function saveSnapshotToList(id, url, count) {
   const list = loadSnapshotsList();
-  list.unshift({ id, url, createdAt: new Date().toISOString(), count });
+  const now = new Date();
+  list.unshift({ id, url, createdAt: now.toISOString(), count, name: `Snapshot ${snapshotTimestamp(now)}` });
   localStorage.setItem(SNAPSHOTS_LIST_KEY, JSON.stringify(list));
 }
 
