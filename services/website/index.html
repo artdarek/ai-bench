@@ -123,6 +123,11 @@
                 </button>
               </li>
               <li class="nav-item" role="presentation">
+                <button class="nav-link" type="button" role="tab" aria-selected="false" data-main-tab="chat">
+                  <i class="bi bi-chat-dots me-1" aria-hidden="true"></i>Chat view
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
                 <button class="nav-link" type="button" role="tab" aria-selected="false" data-main-tab="history" id="historyTabBtn">
                   <i class="bi bi-clock-history me-1" aria-hidden="true"></i>History
                 </button>
@@ -236,6 +241,10 @@
                   </article>
                 </div>
               </div>
+            </div>
+
+            <div class="main-tab-panel hidden chat-view-panel" data-main-panel="chat">
+              <div id="chatViewBody" class="chat-view-body"></div>
             </div>
 
             <div class="main-tab-panel hidden p-3 p-md-4" data-main-panel="history">

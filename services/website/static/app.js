@@ -83,6 +83,7 @@ const el = {
   messageChars: document.getElementById('messageChars'),
   outputChars: document.getElementById('outputChars'),
   history: document.getElementById('history'),
+  chatViewBody: document.getElementById('chatViewBody'),
   historyTabBtn: document.getElementById('historyTabBtn'),
   historyDetailsModal: document.getElementById('historyDetailsModal'),
   historyDetailsCloseBtn: document.getElementById('historyDetailsCloseBtn'),
@@ -255,6 +256,12 @@ async function init() {
   el.historyConfirmActionBtn.addEventListener('click', confirmModalAction);
   el.historySelectAll.addEventListener('change', onHistorySelectAll);
   el.historyViewToggleBtn.addEventListener('click', toggleHistoryView);
+  el.chatViewBody.addEventListener('click', (e) => {
+    const btn = e.target.closest('.chat-info-btn');
+    if (!btn) return;
+    const entry = state.history.find(h => h.id === btn.dataset.entryId);
+    if (entry) openHistoryDetailsModal(entry);
+  });
   el.mainTabButtons.forEach((button) => button.addEventListener('click', onMainTabClick));
   el.historyTabButtons.forEach((button) => button.addEventListener('click', onHistoryTabClick));
   el.chartSelect.addEventListener('change', renderChart);
@@ -1618,6 +1625,9 @@ function setMainTab(tabName) {
   if (tabName === 'charts') {
     renderChart();
   }
+  if (tabName === 'chat') {
+    renderChatView();
+  }
 }
 
 function onHistoryTabClick(event) {
@@ -1746,6 +1756,58 @@ function onCompareModalClick(event) {
   if (event.target.closest('[data-close-compare-modal="true"]')) {
     closeCompareModal();
   }
+}
+
+// ─── Chat View ─────────────────────────────────────────────────────────────
+
+function renderChatView() {
+  const body = el.chatViewBody;
+  body.innerHTML = '';
+
+  const sorted = [...state.history].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  if (!sorted.length) {
+    body.innerHTML = '<p class="text-body-secondary text-center py-5 mb-0">No messages yet.</p>';
+    return;
+  }
+
+  for (const entry of sorted) {
+    // User bubble
+    const userRow = document.createElement('div');
+    userRow.className = 'chat-bubble-row user';
+    userRow.innerHTML = `
+      <div class="chat-avatar">You</div>
+      <div class="chat-bubble-body">
+        <div class="chat-bubble">${escapeHtml(entry.message)}</div>
+        <div class="chat-bubble-meta"><i class="bi bi-clock" aria-hidden="true"></i>${new Date(entry.createdAt).toLocaleString()}</div>
+      </div>`;
+    body.appendChild(userRow);
+
+    // Assistant bubble
+    const model = entry.deployment || entry.model || '';
+    const tokens = entry.usage?.total_tokens != null ? `${entry.usage.total_tokens} tokens` : '';
+    const time = entry.responseTimeMs != null ? `${(entry.responseTimeMs / 1000).toFixed(2)}s` : '';
+    const metaParts = [model, tokens, time].filter(Boolean);
+
+    const metaHtml = metaParts.map(p => `<span>${escapeHtml(p)}</span>`).join('<span class="chat-bubble-meta-dot">·</span>');
+    const aiRow = document.createElement('div');
+    aiRow.className = 'chat-bubble-row assistant';
+    aiRow.innerHTML = `
+      <div class="chat-avatar">AI</div>
+      <div class="chat-bubble-body">
+        <div class="chat-bubble">${escapeHtml(entry.answer)}</div>
+        <div class="chat-bubble-meta">
+          ${metaHtml}
+          ${metaHtml ? '<span class="chat-bubble-meta-dot">·</span>' : ''}
+          <button class="chat-info-btn" data-entry-id="${escapeHtml(entry.id)}" type="button" aria-label="Details" title="Request details">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>`;
+    body.appendChild(aiRow);
+  }
+
+  body.scrollTop = body.scrollHeight;
 }
 
 // ─── Charts ────────────────────────────────────────────────────────────────
