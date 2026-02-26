@@ -908,6 +908,20 @@
   white-space: pre-wrap;
 }
 
+.chat-bubble-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 0.66rem;
+  color: var(--bs-secondary-color);
+}
+
+.chat-bubble-time i {
+  font-size: 0.62rem;
+  opacity: 0.8;
+}
+
 .chat-bubble-chips {
   display: flex;
   flex-wrap: wrap;
@@ -945,11 +959,16 @@
 }
 
 .chat-bubble-row.user .chat-bubble {
-  background: #1e3a5f;
-  color: #e8f0fe;
-  border-color: #1e3a5f;
+  background: #eef3fb;
+  color: #2f4763;
+  border-color: #d6e0ee;
   border-top-right-radius: 4px;
-  white-space: pre-wrap;
+  min-width: 225px;
+}
+
+.chat-bubble-row.user .chat-bubble-time {
+  color: #5f7288;
+  white-space: nowrap;
 }
 
 .chat-bubble-meta {

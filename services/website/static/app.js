@@ -14,6 +14,8 @@ const DEFAULT_SYSTEM_PROMPT =
 const DEFAULT_MESSAGE = 'How are you?';
 
 const MAX_COMPARE = 10;
+const MAIN_TAB_PARAM = 'tab';
+const VALID_MAIN_TABS = new Set(['response', 'chat', 'history', 'charts']);
 
 const state = {
   config: null,
@@ -78,6 +80,9 @@ const el = {
   totalCost: document.getElementById('totalCost'),
   responseTimeMs: document.getElementById('responseTimeMs'),
   contextMessagesCount: document.getElementById('contextMessagesCount'),
+  contextWindowMessages: document.getElementById('contextWindowMessages'),
+  responseRequestedAt: document.getElementById('responseRequestedAt'),
+  responseRespondedAt: document.getElementById('responseRespondedAt'),
   systemPromptChars: document.getElementById('systemPromptChars'),
   contextChars: document.getElementById('contextChars'),
   messageChars: document.getElementById('messageChars'),
@@ -93,11 +98,14 @@ const el = {
   historyTabPanels: Array.from(document.querySelectorAll('[data-history-panel]')),
   historyDetailsId: document.getElementById('historyDetailsId'),
   historyDetailsCreatedAt: document.getElementById('historyDetailsCreatedAt'),
+  historyDetailsRequestedAt: document.getElementById('historyDetailsRequestedAt'),
+  historyDetailsRespondedAt: document.getElementById('historyDetailsRespondedAt'),
   historyDetailsProvider: document.getElementById('historyDetailsProvider'),
   historyDetailsModel: document.getElementById('historyDetailsModel'),
   historyDetailsDeployment: document.getElementById('historyDetailsDeployment'),
   historyDetailsResponseTime: document.getElementById('historyDetailsResponseTime'),
   historyDetailsContextMessages: document.getElementById('historyDetailsContextMessages'),
+  historyDetailsContextWindow: document.getElementById('historyDetailsContextWindow'),
   historyDetailsSystemPromptChars: document.getElementById('historyDetailsSystemPromptChars'),
   historyDetailsContextChars: document.getElementById('historyDetailsContextChars'),
   historyDetailsMessageChars: document.getElementById('historyDetailsMessageChars'),
@@ -175,6 +183,26 @@ function updateSaveBtn() {
     cleanUrl.searchParams.delete('snapshot');
     history.replaceState(null, '', cleanUrl.toString());
   }
+}
+
+function normalizeMainTab(tabName) {
+  return VALID_MAIN_TABS.has(tabName) ? tabName : 'response';
+}
+
+function getMainTabFromUrl() {
+  const params = new URLSearchParams(location.search);
+  return normalizeMainTab(params.get(MAIN_TAB_PARAM));
+}
+
+function updateMainTabInUrl(tabName) {
+  const normalized = normalizeMainTab(tabName);
+  const url = new URL(location.href);
+  if (normalized === 'response') {
+    url.searchParams.delete(MAIN_TAB_PARAM);
+  } else {
+    url.searchParams.set(MAIN_TAB_PARAM, normalized);
+  }
+  history.replaceState(null, '', url.toString());
 }
 
 async function saveSnapshot() {
@@ -272,6 +300,7 @@ async function init() {
   el.compareModal.addEventListener('click', onCompareModalClick);
   el.compareExportBtn.addEventListener('click', exportCompareCsv);
   document.addEventListener('keydown', onGlobalKeyDown);
+  window.addEventListener('popstate', () => setMainTab(getMainTabFromUrl(), { updateUrl: false }));
   el.sendBtn.addEventListener('click', onSend);
   el.headerSaveBtn.addEventListener('click', saveSnapshot);
   el.headerLoadSnapshotBtn.addEventListener('click', openSnapshotsListModal);
@@ -367,6 +396,7 @@ async function init() {
   });
   onHistoryToggleChange();
   resizeMessageInput();
+  setMainTab(getMainTabFromUrl(), { updateUrl: false });
   updateSettingsModalState();
   updateKeyIndicator();
   updateSaveBtn();
@@ -730,15 +760,20 @@ async function onSend() {
     el.inputNonCachedTokensBadge.style.display = cachedTokens > 0 ? '' : 'none';
     el.totalCost.textContent = `$${formatUsd(payload.cost?.total_cost_usd ?? 0)}`;
     el.responseTimeMs.textContent = formatResponseTimeMs(responseTimeMs);
+    el.responseRequestedAt.textContent = formatHistoryDate(payload.requested_at);
+    el.responseRespondedAt.textContent = formatHistoryDate(payload.responded_at);
     el.systemPromptChars.textContent = String(systemPromptChars);
     el.contextChars.textContent = String(contextChars);
     el.messageChars.textContent = String(messageChars);
     el.outputChars.textContent = String(outputChars);
     el.contextMessagesCount.textContent = String(historyContext.contextMessagesCount);
+    el.contextWindowMessages.textContent = String(historyContext.contextWindowMessages);
 
     const historyEntry = {
       id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       createdAt: new Date().toISOString(),
+      requested_at: payload.requested_at,
+      responded_at: payload.responded_at,
       provider,
       model: payload.selected?.resolved_model || payload.selected?.model || '',
       deployment: payload.selected?.deployment || '',
@@ -751,6 +786,7 @@ async function onSend() {
       cost: payload.cost || {},
       responseTimeMs,
       contextMessagesCount: historyContext.contextMessagesCount,
+      contextWindowMessages: historyContext.contextWindowMessages,
       systemPromptChars,
       contextChars,
       messageChars,
@@ -763,6 +799,7 @@ async function onSend() {
     state.snapshotSaved = false;
     updateSaveBtn();
     renderHistory();
+    renderChatView();
     if (!el.keepMessageAfterSend?.checked) {
       el.message.value = '';
     }
@@ -850,6 +887,7 @@ function renderHistory() {
           <h4 class="usage-card-title mb-0">Context</h4>
           <div class="usage-inline-badges d-flex align-items-center gap-2">
             <span class="badge response-token-badge">Messages included: <strong class="ms-1">${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</strong></span>
+            <span class="badge response-time-badge">Window set: <strong class="ms-1">${item.contextWindowMessages ?? 0}</strong></span>
           </div>
         </div>
         <div class="history-chars-row usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
@@ -865,7 +903,9 @@ function renderHistory() {
         <div class="history-time-card usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
           <h4 class="usage-card-title mb-0">Time</h4>
           <div class="usage-inline-badges d-flex align-items-center gap-2">
-            <span class="badge response-time-badge">Response: <strong class="ms-1">${formatResponseTimeMs(item.responseTimeMs)}</strong></span>
+            <span class="badge response-time-badge"><i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>Requested: <strong class="ms-1">${formatHistoryDate(item.requested_at)}</strong></span>
+            <span class="badge response-time-badge"><i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>Responded: <strong class="ms-1">${formatHistoryDate(item.responded_at)}</strong></span>
+            <span class="badge response-time-badge">Response time: <strong class="ms-1">${formatResponseTimeMs(item.responseTimeMs)}</strong></span>
           </div>
         </div>
         <div class="usage-grid usage-grid-compact history-usage-grid mt-2">
@@ -1027,7 +1067,7 @@ function applyHistoryView() {
 
 function buildHistoryContext() {
   if (!el.includeConversationHistory?.checked) {
-    return { messages: [], contextMessagesCount: 0 };
+    return { messages: [], contextMessagesCount: 0, contextWindowMessages: 0 };
   }
 
   const requestedCount = Number.parseInt(el.historyMessageLimit?.value || '0', 10);
@@ -1046,7 +1086,7 @@ function buildHistoryContext() {
     }
   }
 
-  return { messages, contextMessagesCount: latestPairs.length };
+  return { messages, contextMessagesCount: latestPairs.length, contextWindowMessages: pairCount };
 }
 
 function persistHistory() {
@@ -1185,6 +1225,8 @@ function buildCsvContent(items) {
   const header = [
     'id',
     'createdAt',
+    'requested_at',
+    'responded_at',
     'provider',
     'model',
     'deployment',
@@ -1200,6 +1242,7 @@ function buildCsvContent(items) {
     'totalCostUsd',
     'responseTimeMs',
     'contextMessagesCount',
+    'contextWindowMessages',
     'systemPromptChars',
     'contextChars',
     'messageChars',
@@ -1212,6 +1255,8 @@ function buildCsvContent(items) {
   const rows = items.map((item) => [
     item.id,
     item.createdAt,
+    item.requested_at,
+    item.responded_at,
     item.provider,
     item.model,
     item.deployment,
@@ -1227,6 +1272,7 @@ function buildCsvContent(items) {
     item.cost?.total_cost_usd ?? '',
     item.responseTimeMs ?? '',
     item.contextMessagesCount ?? item.contextPairsCount ?? '',
+    item.contextWindowMessages ?? '',
     item.systemPromptChars ?? countChars(item.systemPrompt || ''),
     getContextChars(item),
     item.messageChars ?? '',
@@ -1442,11 +1488,14 @@ function onGlobalKeyDown(event) {
 function openHistoryDetailsModal(entry) {
   el.historyDetailsId.textContent = entry.id || '-';
   el.historyDetailsCreatedAt.textContent = entry.createdAt || '-';
+  el.historyDetailsRequestedAt.textContent = formatHistoryDate(entry.requested_at);
+  el.historyDetailsRespondedAt.textContent = formatHistoryDate(entry.responded_at);
   el.historyDetailsProvider.textContent = entry.provider || '-';
   el.historyDetailsModel.textContent = entry.model || '-';
   el.historyDetailsDeployment.textContent = entry.deployment || '-';
   el.historyDetailsResponseTime.textContent = formatResponseTimeMs(entry.responseTimeMs);
   el.historyDetailsContextMessages.textContent = String(entry.contextMessagesCount ?? entry.contextPairsCount ?? 0);
+  el.historyDetailsContextWindow.textContent = String(entry.contextWindowMessages ?? 0);
   el.historyDetailsSystemPromptChars.textContent = String(getSystemPromptChars(entry));
   el.historyDetailsContextChars.textContent = String(getContextChars(entry));
   el.historyDetailsMessageChars.textContent = String(entry.messageChars ?? countChars(entry.message || ''));
@@ -1610,23 +1659,28 @@ function onMainTabClick(event) {
   setMainTab(tabName);
 }
 
-function setMainTab(tabName) {
+function setMainTab(tabName, options = {}) {
+  const { updateUrl = true } = options;
+  const normalizedTab = normalizeMainTab(tabName);
   el.mainTabButtons.forEach((button) => {
-    const isActive = button.dataset.mainTab === tabName;
+    const isActive = button.dataset.mainTab === normalizedTab;
     button.classList.toggle('active', isActive);
     button.setAttribute('aria-selected', String(isActive));
   });
 
   el.mainTabPanels.forEach((panel) => {
-    const isActive = panel.dataset.mainPanel === tabName;
+    const isActive = panel.dataset.mainPanel === normalizedTab;
     panel.classList.toggle('hidden', !isActive);
   });
 
-  if (tabName === 'charts') {
+  if (normalizedTab === 'charts') {
     renderChart();
   }
-  if (tabName === 'chat') {
+  if (normalizedTab === 'chat') {
     renderChatView();
+  }
+  if (updateUrl) {
+    updateMainTabInUrl(normalizedTab);
   }
 }
 
@@ -1665,10 +1719,13 @@ function getCompareMetrics() {
   return [
     { label: 'Run ID', fn: (e) => e.id },
     { label: 'Date', fn: (e) => formatHistoryDate(e.createdAt) },
+    { label: 'Requested At', fn: (e) => formatHistoryDate(e.requested_at) },
+    { label: 'Responded At', fn: (e) => formatHistoryDate(e.responded_at) },
     { label: 'Provider', fn: (e) => e.provider || '-' },
     { label: 'Model / Deployment', fn: (e) => e.deployment || e.model || '-' },
     { label: 'Response Time', fn: (e) => formatResponseTimeMs(e.responseTimeMs) },
     { label: 'Context Messages', fn: (e) => String(e.contextMessagesCount ?? e.contextPairsCount ?? 0) },
+    { label: 'Context Window Set', fn: (e) => String(e.contextWindowMessages ?? 0) },
     { label: 'System Prompt Chars', fn: (e) => String(getSystemPromptChars(e)) },
     { label: 'Context Chars', fn: (e) => String(getContextChars(e)) },
     { label: 'Message Chars', fn: (e) => String(e.messageChars ?? countChars(e.message || '')) },
@@ -1778,8 +1835,10 @@ function renderChatView() {
     userRow.innerHTML = `
       <div class="chat-avatar">You</div>
       <div class="chat-bubble-body">
-        <div class="chat-bubble">${escapeHtml(entry.message)}</div>
-        <div class="chat-bubble-meta"><i class="bi bi-clock" aria-hidden="true"></i>${new Date(entry.createdAt).toLocaleString()}</div>
+        <div class="chat-bubble">
+          <div class="chat-bubble-content">${escapeHtml(entry.message)}</div>
+          <div class="chat-bubble-time"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatHistoryDate(entry.requested_at))}</div>
+        </div>
       </div>`;
     body.appendChild(userRow);
 
@@ -1820,6 +1879,7 @@ function renderChatView() {
         <div class="chat-bubble">
           ${chipsHtml ? `<div class="chat-bubble-chips">${chipsHtml}</div>` : ''}
           <div class="chat-bubble-content">${escapeHtml(entry.answer)}</div>
+          <div class="chat-bubble-time"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatHistoryDate(entry.responded_at))}</div>
         </div>
         <div class="chat-bubble-meta">
           ${metaHtml}

@@ -178,11 +178,11 @@
                 </div>
                 <div class="row g-3 mb-3">
                   <div class="col-12 col-md-6">
-                    <label class="form-label fw-semibold mb-1" for="responseRawMessagePreview"><i class="bi bi-code-slash label-icon" aria-hidden="true"></i>Raw message (JSON)</label>
+                    <label class="form-label fw-semibold mb-1" for="responseRawMessagePreview"><i class="bi bi-code-slash label-icon" aria-hidden="true"></i>Raw Input</label>
                     <textarea id="responseRawMessagePreview" class="form-control response-raw-textarea" rows="8" readonly></textarea>
                   </div>
                   <div class="col-12 col-md-6">
-                    <label class="form-label fw-semibold mb-1" for="responseRawOutputPreview"><i class="bi bi-code-square label-icon" aria-hidden="true"></i>Raw output (JSON)</label>
+                    <label class="form-label fw-semibold mb-1" for="responseRawOutputPreview"><i class="bi bi-code-square label-icon" aria-hidden="true"></i>Raw output</label>
                     <textarea id="responseRawOutputPreview" class="form-control response-raw-textarea" rows="8" readonly></textarea>
                   </div>
                 </div>
@@ -215,6 +215,8 @@
                     <div class="d-flex align-items-center justify-content-between gap-3">
                       <h3 class="usage-card-title mb-0">Time</h3>
                       <div class="usage-inline-badges d-flex align-items-center gap-2">
+                        <span class="badge response-time-badge"><i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>Requested at: <strong id="responseRequestedAt" class="ms-1">-</strong></span>
+                        <span class="badge response-time-badge"><i class="bi bi-box-arrow-right me-1" aria-hidden="true"></i>Responded at: <strong id="responseRespondedAt" class="ms-1">-</strong></span>
                         <span class="badge response-time-badge">Response: <strong id="responseTimeMs" class="ms-1">0 ms</strong></span>
                       </div>
                     </div>
@@ -224,6 +226,7 @@
                       <h3 class="usage-card-title mb-0">Context</h3>
                       <div class="usage-inline-badges d-flex align-items-center gap-2">
                         <span class="badge response-token-badge">Messages included: <strong id="contextMessagesCount" class="ms-1">0</strong></span>
+                        <span class="badge response-time-badge">Window set: <strong id="contextWindowMessages" class="ms-1">0</strong></span>
                       </div>
                     </div>
                   </article>
@@ -414,6 +417,8 @@
                 <div class="history-details-grid">
                   <div class="meta-label">Run ID</div><div class="meta-value" id="historyDetailsId">-</div>
                   <div class="meta-label">Created At</div><div class="meta-value" id="historyDetailsCreatedAt">-</div>
+                  <div class="meta-label">Requested At</div><div class="meta-value" id="historyDetailsRequestedAt">-</div>
+                  <div class="meta-label">Responded At</div><div class="meta-value" id="historyDetailsRespondedAt">-</div>
                 </div>
               </div>
 
@@ -437,6 +442,7 @@
                 <h4 class="usage-card-title mb-0">Context</h4>
                 <div class="usage-inline-badges d-flex align-items-center gap-2">
                   <span class="badge response-token-badge">Messages included: <strong id="historyDetailsContextMessages" class="ms-1">0</strong></span>
+                  <span class="badge response-time-badge">Window set: <strong id="historyDetailsContextWindow" class="ms-1">0</strong></span>
                 </div>
               </div>
 

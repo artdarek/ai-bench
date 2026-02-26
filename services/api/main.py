@@ -1,6 +1,7 @@
 import json
 import os
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -119,6 +120,10 @@ def normalize_history_messages(items: list[dict[str, str]] | None) -> list[dict[
     return normalized
 
 
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+
 def normalize_azure_endpoint(raw_endpoint: str) -> str:
     endpoint = (raw_endpoint or '').strip()
     if not endpoint:
@@ -146,6 +151,7 @@ def get_config() -> dict[str, Any]:
 
 @app.post('/api/chat')
 def run_chat(payload: ChatRequest) -> dict[str, Any]:
+    requested_at = utc_now_iso()
     cfg = load_provider_config()
     provider_cfg = cfg.get('providers', {}).get(payload.provider)
     if not provider_cfg:
@@ -224,8 +230,11 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
     pricing = get_pricing(provider_cfg, model_name)
     cost = estimate_cost(usage, pricing)
     content = normalize_text_content(getattr(completion.choices[0].message, 'content', ''))
+    responded_at = utc_now_iso()
 
     return {
+        'requested_at': requested_at,
+        'responded_at': responded_at,
         'provider': payload.provider,
         'selected': {
             'model': payload.model,
@@ -242,10 +251,9 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
 
 @app.post('/api/snapshots')
 def create_snapshot(payload: SnapshotRequest) -> dict[str, str]:
-    import datetime
     snapshot_id = str(uuid.uuid4())
     file_path = SNAPSHOTS_DIR / f'{snapshot_id}.json'
-    data = {'id': snapshot_id, 'createdAt': datetime.datetime.utcnow().isoformat() + 'Z', 'history': payload.history}
+    data = {'id': snapshot_id, 'createdAt': utc_now_iso(), 'history': payload.history}
     file_path.write_text(json.dumps(data), encoding='utf-8')
     return {'id': snapshot_id}
 
