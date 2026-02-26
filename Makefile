@@ -1,4 +1,4 @@
-.PHONY: run setup docker-up docker-stop docker-down docker-restart docker-rebuild deploy deploy-codebase deploy-clean deploy-docker-reload ssh help
+.PHONY: run setup docker-up docker-stop docker-down docker-restart docker-rebuild docker-logs deploy deploy-codebase deploy-clean deploy-docker-reload ssh help
 .DEFAULT_GOAL := help
 
 # Load .env if it exists
@@ -43,6 +43,10 @@ docker-restart:
 
 ## Rebuild and restart Docker containers locally
 docker-rebuild: docker-down docker-up
+
+## Follow Docker container logs locally
+docker-logs:
+	docker compose logs -f
 
 ## Deploy codebase + reload Docker on remote server
 deploy: deploy-codebase deploy-docker-reload deploy-clean
