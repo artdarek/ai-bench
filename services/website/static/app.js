@@ -799,9 +799,9 @@ function renderHistory() {
             <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
             <span>${formatHistoryDate(item.createdAt)}</span>
             <span class="dot-sep">•</span>
-            <span class="badge text-bg-secondary">${item.id}</span>
-            <span class="badge text-bg-secondary">${item.provider}</span>
-            <span class="badge text-bg-secondary">${item.deployment || item.model}</span>
+            <span class="badge text-bg-secondary"><i class="bi bi-hash me-1" aria-hidden="true"></i>${escapeHtml(item.id)}</span>
+            <span class="badge text-bg-secondary"><i class="bi bi-hdd-network me-1" aria-hidden="true"></i>${escapeHtml(item.provider || '-')}</span>
+            <span class="badge text-bg-secondary"><i class="bi bi-cpu me-1" aria-hidden="true"></i>${escapeHtml(item.deployment || item.model || '-')}</span>
           </div>
           <div class="d-flex align-items-center gap-2">
             <button class="btn btn-sm btn-outline-secondary history-details-btn" data-entry-id="${item.id}" title="Show details">
@@ -1784,21 +1784,46 @@ function renderChatView() {
     body.appendChild(userRow);
 
     // Assistant bubble
+    const provider = String(entry.provider || '').trim();
+    const providerLabel = state.config?.providers?.[provider]?.label || provider;
     const model = entry.deployment || entry.model || '';
-    const tokens = entry.usage?.total_tokens != null ? `${entry.usage.total_tokens} tokens` : '';
-    const time = entry.responseTimeMs != null ? `${(entry.responseTimeMs / 1000).toFixed(2)}s` : '';
-    const metaParts = [model, tokens, time].filter(Boolean);
+    const inputCachedTokens = Number(entry.usage?.input_cached_tokens ?? 0);
+    const inputTokens = Number(entry.usage?.input_tokens ?? 0);
+    const inputNonCachedTokens = Number(
+      entry.usage?.input_non_cached_tokens ?? Math.max(0, inputTokens - inputCachedTokens),
+    );
+    const outputTokens = Number(entry.usage?.output_tokens ?? 0);
+    const totalTokens = Number(entry.usage?.total_tokens ?? inputTokens + outputTokens);
+    const usageText = `in ${inputNonCachedTokens}/${inputCachedTokens} out ${outputTokens} total ${inputTokens}/${totalTokens}`;
+    const time = entry.responseTimeMs != null ? formatResponseTimeMs(entry.responseTimeMs) : '';
+    const chipParts = [];
+    if (providerLabel) {
+      chipParts.push(`<span class="chat-chip"><i class="bi bi-hdd-network" aria-hidden="true"></i>${escapeHtml(providerLabel)}</span>`);
+    }
+    if (model) {
+      chipParts.push(`<span class="chat-chip"><i class="bi bi-cpu" aria-hidden="true"></i>${escapeHtml(model)}</span>`);
+    }
+    if (time) {
+      chipParts.push(`<span class="chat-chip chat-chip-time"><i class="bi bi-stopwatch" aria-hidden="true"></i>${escapeHtml(time)}</span>`);
+    }
+    const chipsHtml = chipParts.join('');
+    const metaParts = [
+      `<span class="chat-usage-inline"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Usage: ${escapeHtml(usageText)}</span></span>`,
+    ];
 
-    const metaHtml = metaParts.map(p => `<span>${escapeHtml(p)}</span>`).join('<span class="chat-bubble-meta-dot">·</span>');
+    const metaHtml = metaParts.join('<span class="chat-bubble-meta-dot">·</span>');
     const aiRow = document.createElement('div');
     aiRow.className = 'chat-bubble-row assistant';
     aiRow.innerHTML = `
       <div class="chat-avatar">AI</div>
       <div class="chat-bubble-body">
-        <div class="chat-bubble">${escapeHtml(entry.answer)}</div>
+        <div class="chat-bubble">
+          ${chipsHtml ? `<div class="chat-bubble-chips">${chipsHtml}</div>` : ''}
+          <div class="chat-bubble-content">${escapeHtml(entry.answer)}</div>
+        </div>
         <div class="chat-bubble-meta">
           ${metaHtml}
-          ${metaHtml ? '<span class="chat-bubble-meta-dot">·</span>' : ''}
+          ${metaHtml ? '<span class="chat-bubble-meta-dot">|</span>' : ''}
           <button class="chat-info-btn" data-entry-id="${escapeHtml(entry.id)}" type="button" aria-label="Details" title="Request details">
             <i class="bi bi-info-circle" aria-hidden="true"></i>
           </button>
