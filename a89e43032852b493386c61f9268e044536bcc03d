@@ -1,0 +1,23 @@
+Makefile
+  aad7ce4fc3a10053 1,47-50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "a89e43032852b493386c61f9268e044536bcc03d",
+  "prompts": {
+    "aad7ce4fc3a10053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3c4883f1-5958-40de-9995-cd151e7f82fb",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 3,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
