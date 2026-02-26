@@ -1,0 +1,25 @@
+services/website/static/styles.css
+  1bfeb622cddeb3ec 907-941,952,968-978
+services/website/static/app.js
+  1bfeb622cddeb3ec 802-804,1787-1788,1790-1811,1821-1822,1826
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "ff0f2b9f1781999c32dd003addd605d00dde585a",
+  "prompts": {
+    "1bfeb622cddeb3ec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019c99be-274f-77e3-908a-a069a6fa4ad0",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 84,
+      "total_deletions": 13,
+      "accepted_lines": 77,
+      "overriden_lines": 0
+    }
+  }
+}
