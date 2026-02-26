@@ -216,6 +216,7 @@ async function saveSnapshot() {
     const payload = await readApiResponse(response);
     if (!response.ok) throw new Error(payload?.detail || 'Save failed.');
     const url = new URL(location.href);
+    url.search = '';
     url.searchParams.set('snapshot', payload.id);
     history.replaceState(null, '', url.toString());
     state.snapshotSaved = true;
@@ -241,10 +242,12 @@ async function init() {
   }
 
   state.config = payload;
+  let openedFromSnapshot = false;
 
   // Load snapshot from URL (if present)
   const snapshotId = new URLSearchParams(location.search).get('snapshot');
   if (snapshotId) {
+    openedFromSnapshot = true;
     const cleanUrl = new URL(location.href);
     cleanUrl.searchParams.delete('snapshot');
     history.replaceState(null, '', cleanUrl.toString());
@@ -396,7 +399,7 @@ async function init() {
   });
   onHistoryToggleChange();
   resizeMessageInput();
-  setMainTab(getMainTabFromUrl(), { updateUrl: false });
+  setMainTab(openedFromSnapshot ? 'history' : getMainTabFromUrl(), { updateUrl: false });
   updateSettingsModalState();
   updateKeyIndicator();
   updateSaveBtn();
