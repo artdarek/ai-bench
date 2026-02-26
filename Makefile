@@ -57,21 +57,25 @@ deploy-codebase:
 		echo "Error: REMOTE_HOST and REMOTE_WWW_PATH must be set (in .env or as make args)"; \
 		exit 1; \
 	fi
-	ssh -t -p "$(REMOTE_PORT)" "$(REMOTE_USER)@$(REMOTE_HOST)" \
-		"mkdir -p '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)'"
-	scp -r -P "$(REMOTE_PORT)" \
-		./services ./config ./docker-compose.yml ./Dockerfile ./Makefile ./README.md \
-		"$(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)"
+	@archive="/tmp/$(REMOTE_ARTIFACT_DIR).tar.gz"; \
+	tar -czf "$$archive" \
+		--exclude='./services/storage/data/snapshots' \
+		./services ./config ./docker-compose.yml ./Dockerfile ./Makefile ./README.md; \
+	scp -P "$(REMOTE_PORT)" "$$archive" \
+		"$(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR).tar.gz"; \
+	rm -f "$$archive"
 	ssh -t -p "$(REMOTE_PORT)" "$(REMOTE_USER)@$(REMOTE_HOST)" \
 		"sudo mkdir -p '$(REMOTE_WWW_PATH)' && \
+		mkdir -p '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)' && \
+		tar -xzf '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR).tar.gz' -C '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)' && \
 		sudo rm -rf '$(REMOTE_WWW_PATH)/services/api' '$(REMOTE_WWW_PATH)/services/website' '$(REMOTE_WWW_PATH)/config' && \
 		sudo cp -R '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)/.' '$(REMOTE_WWW_PATH)/' && \
 		sudo chmod 0777 '$(REMOTE_WWW_PATH)/services/storage/data'"
 
-## Remove temporary deploy folder on remote server
+## Remove temporary depsaloy folder on remote server
 deploy-clean:
 	ssh -t -p "$(REMOTE_PORT)" "$(REMOTE_USER)@$(REMOTE_HOST)" \
-		"rm -rf '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)'"
+		"rm -rf '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR)' '$(REMOTE_TMP_PATH)/$(REMOTE_ARTIFACT_DIR).tar.gz'"
 
 ## Restart Docker containers on remote server
 deploy-docker-reload:
