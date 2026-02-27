@@ -12,6 +12,7 @@ const MAX_HISTORY = 300;
 const DEFAULT_SYSTEM_PROMPT =
   'You are a friendly and polite assistant. Be warm, helpful, and concise in your responses.';
 const DEFAULT_MESSAGE = 'How are you?';
+const DEFAULT_HISTORY_MESSAGE_LIMIT = 10;
 
 const MAX_COMPARE = 10;
 const MAIN_TAB_PARAM = 'tab';
@@ -194,6 +195,14 @@ function getMainTabFromUrl() {
   return normalizeMainTab(params.get(MAIN_TAB_PARAM));
 }
 
+function normalizeHistoryMessageLimit(value) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_HISTORY_MESSAGE_LIMIT;
+  }
+  return Math.max(1, Math.min(100, parsed));
+}
+
 function updateMainTabInUrl(tabName) {
   const normalized = normalizeMainTab(tabName);
   const url = new URL(location.href);
@@ -277,6 +286,8 @@ async function init() {
   el.deployment.addEventListener('change', () => localStorage.setItem(STORAGE_KEYS.llmDeployment, el.deployment.value));
   el.message.addEventListener('input', resizeMessageInput);
   el.includeConversationHistory.addEventListener('change', onHistoryToggleChange);
+  el.historyMessageLimit.addEventListener('change', onHistoryMessageLimitChange);
+  el.historyMessageLimit.addEventListener('input', onHistoryMessageLimitChange);
   el.keepMessageAfterSend.addEventListener('change', onKeepMessageAfterSendChange);
   el.history.addEventListener('click', onHistoryClick);
   el.historyDetailsModal.addEventListener('click', onModalClick);
@@ -517,6 +528,13 @@ function onHistoryToggleChange() {
   const enabled = Boolean(el.includeConversationHistory?.checked);
   el.historyMessageLimit.disabled = !enabled;
   state.uiPrefs.includeConversationHistory = enabled;
+  persistUiPrefs();
+}
+
+function onHistoryMessageLimitChange() {
+  const normalized = normalizeHistoryMessageLimit(el.historyMessageLimit?.value);
+  el.historyMessageLimit.value = String(normalized);
+  state.uiPrefs.historyMessageLimit = normalized;
   persistUiPrefs();
 }
 
@@ -1042,6 +1060,9 @@ function applyUiPreferences() {
   if (typeof state.uiPrefs?.includeConversationHistory === 'boolean') {
     el.includeConversationHistory.checked = state.uiPrefs.includeConversationHistory;
   }
+  const initialHistoryLimit = normalizeHistoryMessageLimit(state.uiPrefs?.historyMessageLimit);
+  el.historyMessageLimit.value = String(initialHistoryLimit);
+  state.uiPrefs.historyMessageLimit = initialHistoryLimit;
 }
 
 function onKeepMessageAfterSendChange() {
