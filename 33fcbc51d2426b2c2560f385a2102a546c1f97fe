@@ -1,0 +1,25 @@
+README.md
+  0182d3dd781785fe 3,8,11,51-54
+services/api/main.py
+  0182d3dd781785fe 4,29-35,50,120-220,222-251,253,299,316,339,351,354,367
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "33fcbc51d2426b2c2560f385a2102a546c1f97fe",
+  "prompts": {
+    "0182d3dd781785fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cb99b-3a1f-7bb2-991a-ee553e8bdb93",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 180,
+      "total_deletions": 53,
+      "accepted_lines": 156,
+      "overriden_lines": 0
+    }
+  }
+}
