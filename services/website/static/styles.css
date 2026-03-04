@@ -95,6 +95,16 @@
   margin-right: 0.35rem;
 }
 
+.system-prompt-char-pill {
+  background: #e9eef5;
+  color: #4b5d73;
+  border: 1px solid #ccd6e2;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
 .history-context-row .form-check {
   margin-right: 0.1rem;
 }
@@ -1054,6 +1064,47 @@
   color: #2f4a66;
 }
 
+.compare-run-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.compare-diff-toggle {
+  border: none;
+  background: transparent;
+  color: #2f4a66;
+  opacity: 0.65;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
+}
+
+.compare-diff-toggle:hover {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+.compare-diff-toggle.is-open {
+  opacity: 1;
+  color: #0d6efd;
+}
+
+.compare-diff-toggle-disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.compare-th-diff {
+  min-width: 160px;
+  color: #0b7285;
+  background: #eef7fb;
+}
+
 .compare-td {
   border: 1px solid var(--border);
   padding: 0.5rem 0.85rem;
@@ -1077,6 +1128,28 @@
   max-width: 340px;
   font-size: 0.82rem;
   color: #304152;
+}
+
+.compare-td-diff {
+  min-width: 160px;
+  font-variant-numeric: tabular-nums;
+  color: #0b5563;
+  background: #f4fbff;
+}
+
+.compare-col-enter {
+  animation: compareColSlideIn 180ms ease-out;
+}
+
+@keyframes compareColSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .compare-table tr:hover td,

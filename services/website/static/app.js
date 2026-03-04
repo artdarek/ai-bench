@@ -25,6 +25,7 @@ const state = {
   pendingConfirmAction: null,
   compareSelection: new Set(),
   compareEntries: [],
+  compareDiffPairs: new Set(),
   uiPrefs: loadUiPrefs(),
   hasResponseData: false,
   chartInstance: null,
@@ -41,6 +42,8 @@ const el = {
   modelWrap: document.getElementById('modelWrap'),
   deploymentWrap: document.getElementById('deploymentWrap'),
   systemPrompt: document.getElementById('systemPrompt'),
+  systemPromptCharPill: document.getElementById('systemPromptCharPill'),
+  messageCharPill: document.getElementById('messageCharPill'),
   includeConversationHistory: document.getElementById('includeConversationHistory'),
   historyMessageLimit: document.getElementById('historyMessageLimit'),
   message: document.getElementById('message'),
@@ -284,6 +287,8 @@ async function init() {
   el.provider.addEventListener('change', onProviderChange);
   el.model.addEventListener('change', () => localStorage.setItem(STORAGE_KEYS.llmModel, el.model.value));
   el.deployment.addEventListener('change', () => localStorage.setItem(STORAGE_KEYS.llmDeployment, el.deployment.value));
+  el.systemPrompt.addEventListener('input', updateSystemPromptCharPill);
+  el.message.addEventListener('input', updateMessageCharPill);
   el.message.addEventListener('input', resizeMessageInput);
   el.includeConversationHistory.addEventListener('change', onHistoryToggleChange);
   el.historyMessageLimit.addEventListener('change', onHistoryMessageLimitChange);
@@ -410,6 +415,8 @@ async function init() {
   });
   onHistoryToggleChange();
   resizeMessageInput();
+  updateSystemPromptCharPill();
+  updateMessageCharPill();
   setMainTab(openedFromSnapshot ? 'history' : getMainTabFromUrl(), { updateUrl: false });
   updateSettingsModalState();
   updateKeyIndicator();
@@ -461,9 +468,11 @@ function applyDefaultPrompts() {
   if (!el.systemPrompt.value.trim()) {
     el.systemPrompt.value = DEFAULT_SYSTEM_PROMPT;
   }
+  updateSystemPromptCharPill();
   if (!el.message.value.trim()) {
     el.message.value = DEFAULT_MESSAGE;
   }
+  updateMessageCharPill();
 }
 
 function onProviderChange() {
@@ -514,7 +523,9 @@ function onProviderChange() {
 
   // Keep user drafts untouched when switching provider/model/deployment.
   el.systemPrompt.value = draftSystemPrompt;
+  updateSystemPromptCharPill();
   el.message.value = draftMessage;
+  updateMessageCharPill();
   resizeMessageInput();
   localStorage.setItem(STORAGE_KEYS.llmProvider, provider);
   if (el.settingsProvider.value !== provider) {
@@ -522,6 +533,20 @@ function onProviderChange() {
     updateSettingsModalState();
   }
   updateKeyIndicator();
+}
+
+function updateSystemPromptCharPill() {
+  if (!el.systemPromptCharPill) {
+    return;
+  }
+  el.systemPromptCharPill.textContent = `${countChars(el.systemPrompt?.value || '')} chars`;
+}
+
+function updateMessageCharPill() {
+  if (!el.messageCharPill) {
+    return;
+  }
+  el.messageCharPill.textContent = `${countChars(el.message?.value || '')} chars`;
 }
 
 function onHistoryToggleChange() {
@@ -825,6 +850,7 @@ async function onSend() {
       el.message.value = '';
     }
     resizeMessageInput();
+    updateMessageCharPill();
     setStatus('Done.', 'success');
   } catch (error) {
     setStatus(error.message, 'error');
@@ -1239,8 +1265,10 @@ function onHistoryClick(event) {
     }
 
     el.systemPrompt.value = entry.systemPrompt || '';
+    updateSystemPromptCharPill();
     el.message.value = entry.message || '';
     resizeMessageInput();
+    updateMessageCharPill();
     setStatus('History entry loaded into form.', 'success');
   }
 }
@@ -1387,14 +1415,10 @@ function formatUsd(value) {
 function formatResponseTimeMs(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0) {
-    return '0 ms';
+    return '0s 0ms';
   }
 
   const rounded = Math.round(numeric);
-  if (rounded < 1000) {
-    return `${rounded} ms`;
-  }
-
   const seconds = Math.floor(rounded / 1000);
   const msRemainder = rounded % 1000;
   return `${seconds}s ${msRemainder}ms`;
@@ -1747,27 +1771,137 @@ function getCompareMetrics() {
     { label: 'Responded At', fn: (e) => formatHistoryDate(e.responded_at) },
     { label: 'Provider', fn: (e) => e.provider || '-' },
     { label: 'Model / Deployment', fn: (e) => e.deployment || e.model || '-' },
-    { label: 'Response Time', fn: (e) => formatResponseTimeMs(e.responseTimeMs) },
-    { label: 'Context Messages', fn: (e) => String(e.contextMessagesCount ?? e.contextPairsCount ?? 0) },
-    { label: 'Context Window Set', fn: (e) => String(e.contextWindowMessages ?? 0) },
-    { label: 'System Prompt Chars', fn: (e) => String(getSystemPromptChars(e)) },
-    { label: 'Context Chars', fn: (e) => String(getContextChars(e)) },
-    { label: 'Message Chars', fn: (e) => String(e.messageChars ?? countChars(e.message || '')) },
-    { label: 'Output Chars', fn: (e) => String(e.outputChars ?? countChars(e.answer || '')) },
-    { label: 'Input Tokens', fn: (e) => String(e.usage?.input_tokens ?? 0) },
-    { label: 'Input Cached Tokens', fn: (e) => String(e.usage?.input_cached_tokens ?? 0) },
-    { label: 'Input Non-cached Tokens', fn: (e) => String(e.usage?.input_non_cached_tokens ?? 0) },
-    { label: 'Output Tokens', fn: (e) => String(e.usage?.output_tokens ?? 0) },
-    { label: 'Total Tokens', fn: (e) => String(e.usage?.total_tokens ?? 0) },
-    { label: 'Input Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_cost_usd ?? 0)}` },
-    { label: 'Input Non-cached Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_non_cached_cost_usd ?? 0)}` },
-    { label: 'Input Cached Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_cached_cost_usd ?? 0)}` },
-    { label: 'Output Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.output_cost_usd ?? 0)}` },
-    { label: 'Total Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.total_cost_usd ?? 0)}` },
+    { label: 'Response Time', fn: (e) => formatResponseTimeMs(e.responseTimeMs), diffValueFn: (e) => Number(e.responseTimeMs ?? 0), diffFormatFn: (v) => formatDurationDiffMs(v) },
+    { label: 'Context Messages', fn: (e) => String(e.contextMessagesCount ?? e.contextPairsCount ?? 0), diffValueFn: (e) => Number(e.contextMessagesCount ?? e.contextPairsCount ?? 0) },
+    { label: 'Context Window Set', fn: (e) => String(e.contextWindowMessages ?? 0), diffValueFn: (e) => Number(e.contextWindowMessages ?? 0) },
+    { label: 'System Prompt Chars', fn: (e) => String(getSystemPromptChars(e)), diffValueFn: (e) => Number(getSystemPromptChars(e)) },
+    { label: 'Context Chars', fn: (e) => String(getContextChars(e)), diffValueFn: (e) => Number(getContextChars(e)) },
+    { label: 'Message Chars', fn: (e) => String(e.messageChars ?? countChars(e.message || '')), diffValueFn: (e) => Number(e.messageChars ?? countChars(e.message || '')) },
+    { label: 'Output Chars', fn: (e) => String(e.outputChars ?? countChars(e.answer || '')), diffValueFn: (e) => Number(e.outputChars ?? countChars(e.answer || '')) },
+    { label: 'Input Tokens', fn: (e) => String(e.usage?.input_tokens ?? 0), diffValueFn: (e) => Number(e.usage?.input_tokens ?? 0) },
+    { label: 'Input Cached Tokens', fn: (e) => String(e.usage?.input_cached_tokens ?? 0), diffValueFn: (e) => Number(e.usage?.input_cached_tokens ?? 0) },
+    { label: 'Input Non-cached Tokens', fn: (e) => String(e.usage?.input_non_cached_tokens ?? 0), diffValueFn: (e) => Number(e.usage?.input_non_cached_tokens ?? 0) },
+    { label: 'Output Tokens', fn: (e) => String(e.usage?.output_tokens ?? 0), diffValueFn: (e) => Number(e.usage?.output_tokens ?? 0) },
+    { label: 'Total Tokens', fn: (e) => String(e.usage?.total_tokens ?? 0), diffValueFn: (e) => Number(e.usage?.total_tokens ?? 0) },
+    { label: 'Input Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_cost_usd ?? 0)}`, diffValueFn: (e) => Number(e.cost?.input_cost_usd ?? 0), diffFormatFn: (v) => formatCurrencyDiff(v) },
+    { label: 'Input Non-cached Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_non_cached_cost_usd ?? 0)}`, diffValueFn: (e) => Number(e.cost?.input_non_cached_cost_usd ?? 0), diffFormatFn: (v) => formatCurrencyDiff(v) },
+    { label: 'Input Cached Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_cached_cost_usd ?? 0)}`, diffValueFn: (e) => Number(e.cost?.input_cached_cost_usd ?? 0), diffFormatFn: (v) => formatCurrencyDiff(v) },
+    { label: 'Output Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.output_cost_usd ?? 0)}`, diffValueFn: (e) => Number(e.cost?.output_cost_usd ?? 0), diffFormatFn: (v) => formatCurrencyDiff(v) },
+    { label: 'Total Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.total_cost_usd ?? 0)}`, diffValueFn: (e) => Number(e.cost?.total_cost_usd ?? 0), diffFormatFn: (v) => formatCurrencyDiff(v) },
     { label: 'System Prompt', fn: (e) => e.systemPrompt || '' },
     { label: 'Message', fn: (e) => e.message || '' },
     { label: 'Answer', fn: (e) => e.answer || '' },
   ];
+}
+
+function getCompareRunLabel(index, total) {
+  return `Run ${total - index}`;
+}
+
+function getComparePairKey(leftIndex) {
+  return `${leftIndex}:${leftIndex + 1}`;
+}
+
+function formatDurationDiffMs(value) {
+  if (!Number.isFinite(value)) {
+    return '-';
+  }
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  const absMs = Math.abs(value);
+  const rounded = Math.round(absMs);
+  const seconds = Math.floor(rounded / 1000);
+  const msRemainder = rounded % 1000;
+  return `${sign}${seconds}s ${msRemainder}ms`;
+}
+
+function formatCompareDiffValue(value) {
+  if (!Number.isFinite(value)) {
+    return '-';
+  }
+  if (Math.abs(value - Math.round(value)) < 1e-9) {
+    return value > 0 ? `+${Math.round(value)}` : String(Math.round(value));
+  }
+  const rounded = Number(value.toFixed(8));
+  return rounded > 0 ? `+${rounded}` : String(rounded);
+}
+
+function formatCompareMetricDiff(metric, value) {
+  if (!Number.isFinite(value)) {
+    return '-';
+  }
+  if (typeof metric.diffFormatFn === 'function') {
+    return metric.diffFormatFn(value);
+  }
+  return formatCompareDiffValue(value);
+}
+
+function formatCurrencyDiff(value) {
+  if (!Number.isFinite(value)) {
+    return '-';
+  }
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return `${sign}$${formatUsd(Math.abs(value))}`;
+}
+
+function buildCompareColumns(entries) {
+  const columns = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    columns.push({ type: 'run', index });
+    if (index < entries.length - 1 && state.compareDiffPairs.has(getComparePairKey(index))) {
+      columns.push({ type: 'diff', leftIndex: index, rightIndex: index + 1 });
+    }
+  }
+  return columns;
+}
+
+function renderCompareTable(entries) {
+  const metrics = getCompareMetrics();
+  const textMetricLabels = new Set(['System Prompt', 'Message', 'Answer']);
+  const columns = buildCompareColumns(entries);
+
+  const headCols = columns
+    .map((column) => {
+      if (column.type === 'diff') {
+        const leftLabel = getCompareRunLabel(column.leftIndex, entries.length);
+        const rightLabel = getCompareRunLabel(column.rightIndex, entries.length);
+        return `<th class="compare-th compare-th-entry compare-th-diff compare-col-enter" scope="col">Δ ${leftLabel}→${rightLabel}</th>`;
+      }
+
+      const runLabel = getCompareRunLabel(column.index, entries.length);
+      const hasRightNeighbor = column.index < entries.length - 1;
+      const isDiffOpen = hasRightNeighbor && state.compareDiffPairs.has(getComparePairKey(column.index));
+      const toggleButton = hasRightNeighbor
+        ? `<button type="button" class="compare-diff-toggle${isDiffOpen ? ' is-open' : ''}" data-compare-diff-toggle="${column.index}" aria-label="Toggle difference to next run"><i class="bi bi-arrow-right" aria-hidden="true"></i></button>`
+        : '';
+      return `<th class="compare-th compare-th-entry" scope="col"><div class="compare-run-head"><span>${runLabel}</span>${toggleButton}</div></th>`;
+    })
+    .join('');
+
+  el.compareTableHead.innerHTML = `<tr><th class="compare-th compare-th-metric" scope="col">Metric</th>${headCols}</tr>`;
+
+  const bodyRows = metrics
+    .map((metric) => {
+      const isText = textMetricLabels.has(metric.label);
+      const cells = columns
+        .map((column) => {
+          if (column.type === 'diff') {
+            if (typeof metric.diffValueFn !== 'function') {
+              return '<td class="compare-td compare-td-diff compare-col-enter">-</td>';
+            }
+            const leftValue = Number(metric.diffValueFn(entries[column.leftIndex]));
+            const rightValue = Number(metric.diffValueFn(entries[column.rightIndex]));
+            const diffValue = Number.isFinite(leftValue) && Number.isFinite(rightValue) ? rightValue - leftValue : NaN;
+            return `<td class="compare-td compare-td-diff compare-col-enter">${escapeHtml(formatCompareMetricDiff(metric, diffValue))}</td>`;
+          }
+          const value = metric.fn(entries[column.index]);
+          return `<td class="compare-td${isText ? ' compare-td-text' : ''}">${escapeHtml(isText ? shorten(value, 300) : value)}</td>`;
+        })
+        .join('');
+      return `<tr><th class="compare-td compare-td-label" scope="row">${escapeHtml(metric.label)}</th>${cells}</tr>`;
+    })
+    .join('');
+
+  el.compareTableBody.innerHTML = bodyRows;
 }
 
 function openCompareModal() {
@@ -1782,26 +1916,8 @@ function openCompareModal() {
   }
 
   state.compareEntries = entries;
-  const metrics = getCompareMetrics();
-  const textMetricLabels = new Set(['System Prompt', 'Message', 'Answer']);
-
-  const headCols = entries
-    .map((_, i) => `<th class="compare-th compare-th-entry" scope="col">Run ${i + 1}</th>`)
-    .join('');
-  el.compareTableHead.innerHTML = `<tr><th class="compare-th compare-th-metric" scope="col">Metric</th>${headCols}</tr>`;
-
-  const bodyRows = metrics
-    .map((metric) => {
-      const isText = textMetricLabels.has(metric.label);
-      const values = entries.map((e) => metric.fn(e));
-      const cells = values
-        .map((v) => `<td class="compare-td${isText ? ' compare-td-text' : ''}">${escapeHtml(isText ? shorten(v, 300) : v)}</td>`)
-        .join('');
-      return `<tr><th class="compare-td compare-td-label" scope="row">${escapeHtml(metric.label)}</th>${cells}</tr>`;
-    })
-    .join('');
-
-  el.compareTableBody.innerHTML = bodyRows;
+  state.compareDiffPairs = new Set();
+  renderCompareTable(entries);
   el.compareModal.classList.remove('hidden');
 }
 
@@ -1812,8 +1928,30 @@ function exportCompareCsv() {
   }
 
   const metrics = getCompareMetrics();
-  const header = ['Metric', ...entries.map((_, i) => `Run ${i + 1}`)];
-  const rows = metrics.map((metric) => [metric.label, ...entries.map((e) => metric.fn(e))]);
+  const columns = buildCompareColumns(entries);
+  const header = ['Metric', ...columns.map((column) => {
+    if (column.type === 'diff') {
+      const leftLabel = getCompareRunLabel(column.leftIndex, entries.length);
+      const rightLabel = getCompareRunLabel(column.rightIndex, entries.length);
+      return `Δ ${leftLabel}->${rightLabel}`;
+    }
+    return getCompareRunLabel(column.index, entries.length);
+  })];
+  const rows = metrics.map((metric) => {
+    const values = columns.map((column) => {
+      if (column.type === 'diff') {
+        if (typeof metric.diffValueFn !== 'function') {
+          return '-';
+        }
+        const leftValue = Number(metric.diffValueFn(entries[column.leftIndex]));
+        const rightValue = Number(metric.diffValueFn(entries[column.rightIndex]));
+        const diffValue = Number.isFinite(leftValue) && Number.isFinite(rightValue) ? rightValue - leftValue : NaN;
+        return formatCompareMetricDiff(metric, diffValue);
+      }
+      return metric.fn(entries[column.index]);
+    });
+    return [metric.label, ...values];
+  });
   const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -1831,9 +1969,26 @@ function exportCompareCsv() {
 
 function closeCompareModal() {
   el.compareModal.classList.add('hidden');
+  state.compareDiffPairs = new Set();
 }
 
 function onCompareModalClick(event) {
+  const diffToggleBtn = event.target.closest('[data-compare-diff-toggle]');
+  if (diffToggleBtn) {
+    const leftIndex = Number(diffToggleBtn.dataset.compareDiffToggle);
+    if (!Number.isInteger(leftIndex)) {
+      return;
+    }
+    const pairKey = getComparePairKey(leftIndex);
+    if (state.compareDiffPairs.has(pairKey)) {
+      state.compareDiffPairs.delete(pairKey);
+    } else {
+      state.compareDiffPairs.add(pairKey);
+    }
+    renderCompareTable(state.compareEntries);
+    return;
+  }
+
   if (event.target.closest('[data-close-compare-modal="true"]')) {
     closeCompareModal();
   }

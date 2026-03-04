@@ -68,7 +68,10 @@
               </section>
 
               <section class="control-group mb-3">
-                <label class="form-label fw-semibold" for="systemPrompt"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <label class="form-label fw-semibold mb-0" for="systemPrompt"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
+                  <span id="systemPromptCharPill" class="badge system-prompt-char-pill" aria-live="polite">0 chars</span>
+                </div>
                 <textarea id="systemPrompt" class="form-control" rows="6" placeholder="System instructions"></textarea>
                 <div class="d-flex flex-wrap align-items-center gap-1 mt-2 history-context-row">
                   <div class="form-check form-switch mb-0">
@@ -93,7 +96,10 @@
 
               <section class="control-group">
                 <div class="mb-3">
-                  <label class="form-label fw-semibold" for="message"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+                  <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label fw-semibold mb-0" for="message"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+                    <span id="messageCharPill" class="badge system-prompt-char-pill" aria-live="polite">0 chars</span>
+                  </div>
                   <div class="input-group message-input-group">
                     <textarea id="message" class="form-control" rows="1" placeholder="User message"></textarea>
                     <button id="sendBtn" class="btn btn-primary send-btn-inline" type="button">
