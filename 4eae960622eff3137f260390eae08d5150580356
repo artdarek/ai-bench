@@ -1,0 +1,27 @@
+services/website/index.html
+  62f941f275d768b1 7,44-47,104,107-108,121-122,124,132
+services/website/static/app.js
+  62f941f275d768b1 1,100-101,306-307,471,1922-1935
+services/website/static/styles.css
+  62f941f275d768b1 1-32,1554-1764
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "4eae960622eff3137f260390eae08d5150580356",
+  "prompts": {
+    "62f941f275d768b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8eee8daf-2be8-4e54-94a8-7340eeba18e1",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 316,
+      "total_deletions": 50,
+      "accepted_lines": 276,
+      "overriden_lines": 0
+    }
+  }
+}
