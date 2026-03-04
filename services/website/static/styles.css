@@ -75,6 +75,26 @@
   margin-top: 0.1rem;
 }
 
+.header-logo-box {
+  align-self: stretch;
+  border-radius: 0.55rem;
+  background: var(--text);
+  color: var(--app-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+[data-bs-theme="light"] .header-logo-box {
+  background: #1f2933;
+}
+
+.header-tagline {
+  font-size: 0.78rem;
+}
+
 .btn-icon {
   position: relative;
   background: #242744;

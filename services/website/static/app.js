@@ -391,6 +391,8 @@ async function init() {
   el.compareExportBtn.addEventListener('click', exportCompareCsv);
   document.addEventListener('keydown', onGlobalKeyDown);
   window.addEventListener('popstate', () => setMainTab(getMainTabFromUrl(), { updateUrl: false }));
+  window.addEventListener('resize', syncLogoBox);
+  syncLogoBox();
   el.sendBtn.addEventListener('click', onSend);
   el.headerSaveBtn.addEventListener('click', saveSnapshot);
   el.headerLoadSnapshotBtn.addEventListener('click', openSnapshotsListModal);
@@ -1917,6 +1919,11 @@ function setResponseLoading(isLoading) {
 function setResponseHasData(hasData) {
   state.hasResponseData = Boolean(hasData);
   el.responseContent.classList.toggle('response-empty', !state.hasResponseData);
+}
+
+function syncLogoBox() {
+  const box = document.querySelector('.header-logo-box');
+  if (box) box.style.width = box.offsetHeight + 'px';
 }
 
 function applyTheme(theme) {
