@@ -48,6 +48,8 @@
         <aside class="col-12 col-xl-4">
           <section class="card shadow-sm border-0 sidebar-card">
             <div class="card-body p-3 p-md-4">
+              <div id="status" class="status mb-3 mt-0" role="alert"></div>
+
               <section class="control-group mb-3">
                 <div class="row g-3">
                   <div class="col-12 col-md-6">
@@ -112,10 +114,40 @@
                       Keep message for next request
                     </label>
                   </div>
+                  <div class="attachments-wrap mt-2">
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                      <label class="form-label fw-semibold mb-0" for="attachmentsInput">
+                        <i class="bi bi-paperclip label-icon" aria-hidden="true"></i>Attachments
+                      </label>
+                      <span id="attachmentsActiveCountPill" class="badge system-prompt-char-pill" aria-live="polite" title="Active attachments">0</span>
+                    </div>
+                    <input
+                      id="attachmentsInput"
+                      class="form-control form-control-sm mt-1"
+                      type="file"
+                      multiple
+                      accept=".c,.cpp,.cs,.css,.csv,.gif,.go,.html,.java,.jpeg,.jpg,.js,.json,.md,.pdf,.php,.png,.py,.rb,.sh,.tex,.ts,.txt,.webp,.xml"
+                    />
+                    <div class="form-check form-switch mt-2">
+                      <input class="form-check-input" type="checkbox" id="keepAttachmentsAfterSend" />
+                      <label class="form-check-label text-body-secondary" for="keepAttachmentsAfterSend">
+                        Keep attachments for next request
+                      </label>
+                    </div>
+                    <div id="attachmentsList" class="attachments-list mt-3"></div>
+                    <div id="attachmentsActionsRow" class="attachments-actions-row mt-2 hidden">
+                      <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="attachmentsSelectAll" />
+                        <label class="form-check-label text-body-secondary" for="attachmentsSelectAll">Select all</label>
+                      </div>
+                      <button id="clearAttachmentsBtn" class="attachments-clear-btn hidden" type="button">
+                        Clear All <i class="bi bi-trash3 ms-1 attachments-clear-btn-icon" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </section>
 
-              <div id="status" class="status mb-0 mt-3" role="alert"></div>
             </div>
           </section>
         </aside>
@@ -248,6 +280,12 @@
                       </div>
                     </div>
                   </article>
+                  <article class="usage-card usage-card-full" id="responseFilesBox">
+                    <div class="d-flex align-items-center justify-content-between gap-3">
+                      <h3 class="usage-card-title mb-0">Files</h3>
+                      <div id="responseFilesChips" class="response-files-chips"></div>
+                    </div>
+                  </article>
                 </div>
               </div>
             </div>
@@ -290,39 +328,100 @@
             </div>
 
             <div class="main-tab-panel hidden p-3 p-md-4" data-main-panel="charts">
-              <div class="control-group mb-4">
-                <label class="form-label fw-semibold mb-2" for="chartSelect">
-                  <i class="bi bi-bar-chart label-icon" aria-hidden="true"></i>Chart
-                </label>
-                <select id="chartSelect" class="form-select chart-select">
-                  <option value="tokensVsResponseTime" selected>Request / Response Metrics</option>
-                  <option value="cumulativeUsage">Cumulative usage</option>
-                </select>
+              <div id="chartsControls" class="charts-controls mb-3">
+                <div class="charts-controls-title">
+                  <i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>Visible charts
+                </div>
+                <div id="chartsVisibilityToggles" class="charts-visibility-toggles"></div>
               </div>
               <p id="chartsEmpty" class="text-body-secondary hidden">No history data to display charts.</p>
               <div id="chartsWrap">
-                <div class="chart-canvas-wrap">
-                  <div class="chart-label" id="chartLabel"></div>
+                <div id="chartsWrap1" class="chart-canvas-wrap" draggable="true">
+                  <div class="chart-header">
+                    <div class="chart-label" id="chartLabel"></div>
+                    <button class="chart-toggle-btn" type="button" data-chart-toggle="true" aria-label="Collapse chart" aria-expanded="true" title="Collapse chart">
+                      <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                    </button>
+                  </div>
                   <div class="chart-canvas-inner">
                     <canvas id="mainChart"></canvas>
                   </div>
                 </div>
-                <div id="chartsWrap2" class="chart-canvas-wrap mt-3 hidden">
-                  <div class="chart-label" id="chartLabel2"></div>
+                <div id="chartsWrap2" class="chart-canvas-wrap hidden" draggable="true">
+                  <div class="chart-header">
+                    <div class="chart-label" id="chartLabel2"></div>
+                    <button class="chart-toggle-btn" type="button" data-chart-toggle="true" aria-label="Collapse chart" aria-expanded="true" title="Collapse chart">
+                      <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                    </button>
+                  </div>
                   <div class="chart-canvas-inner">
                     <canvas id="mainChart2"></canvas>
                   </div>
                 </div>
-                <div id="chartsWrap3" class="chart-canvas-wrap mt-3 hidden">
-                  <div class="chart-label" id="chartLabel3"></div>
+                <div id="chartsWrap3" class="chart-canvas-wrap hidden" draggable="true">
+                  <div class="chart-header">
+                    <div class="chart-label" id="chartLabel3"></div>
+                    <button class="chart-toggle-btn" type="button" data-chart-toggle="true" aria-label="Collapse chart" aria-expanded="true" title="Collapse chart">
+                      <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                    </button>
+                  </div>
                   <div class="chart-canvas-inner">
                     <canvas id="mainChart3"></canvas>
                   </div>
                 </div>
-                <div id="chartsWrap4" class="chart-canvas-wrap mt-3 hidden">
-                  <div class="chart-label" id="chartLabel4"></div>
+                <div id="chartsWrap4" class="chart-canvas-wrap hidden" draggable="true">
+                  <div class="chart-header">
+                    <div class="chart-label" id="chartLabel4"></div>
+                    <button class="chart-toggle-btn" type="button" data-chart-toggle="true" aria-label="Collapse chart" aria-expanded="true" title="Collapse chart">
+                      <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                    </button>
+                  </div>
                   <div class="chart-canvas-inner">
                     <canvas id="mainChart4"></canvas>
+                  </div>
+                </div>
+                <div id="chartsWrap5" class="chart-canvas-wrap hidden" draggable="true">
+                  <div class="chart-header">
+                    <div class="chart-label" id="chartLabel5"></div>
+                    <button class="chart-toggle-btn" type="button" data-chart-toggle="true" aria-label="Collapse chart" aria-expanded="true" title="Collapse chart">
+                      <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="chart-canvas-inner">
+                    <canvas id="mainChart5"></canvas>
+                  </div>
+                </div>
+                <div id="chartsWrap6" class="chart-canvas-wrap hidden" draggable="true">
+                  <div class="chart-header">
+                    <div class="chart-label" id="chartLabel6"></div>
+                    <button class="chart-toggle-btn" type="button" data-chart-toggle="true" aria-label="Collapse chart" aria-expanded="true" title="Collapse chart">
+                      <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="chart-canvas-inner">
+                    <canvas id="mainChart6"></canvas>
+                  </div>
+                </div>
+                <div id="chartsWrap7" class="chart-canvas-wrap hidden" draggable="true">
+                  <div class="chart-header">
+                    <div class="chart-label" id="chartLabel7"></div>
+                    <button class="chart-toggle-btn" type="button" data-chart-toggle="true" aria-label="Collapse chart" aria-expanded="true" title="Collapse chart">
+                      <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="chart-canvas-inner">
+                    <canvas id="mainChart7"></canvas>
+                  </div>
+                </div>
+                <div id="chartsWrap8" class="chart-canvas-wrap hidden" draggable="true">
+                  <div class="chart-header">
+                    <div class="chart-label" id="chartLabel8"></div>
+                    <button class="chart-toggle-btn" type="button" data-chart-toggle="true" aria-label="Collapse chart" aria-expanded="true" title="Collapse chart">
+                      <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="chart-canvas-inner">
+                    <canvas id="mainChart8"></canvas>
                   </div>
                 </div>
               </div>
@@ -462,6 +561,7 @@
                   <span class="badge response-time-badge">Output: <strong id="historyDetailsOutputChars" class="ms-1">0</strong></span>
                 </div>
               </div>
+
             </div>
 
             <div class="d-flex flex-column gap-2">
@@ -511,6 +611,12 @@
                     <span class="badge response-cost-badge">Cost: <strong id="historyDetailsTotalCost" class="ms-1">$0.00000000</strong></span>
                   </div>
                 </article>
+              </div>
+              <div class="usage-card">
+                <div class="d-flex align-items-center justify-content-between gap-3">
+                  <h4 class="usage-card-title mb-0">Files</h4>
+                  <div id="historyDetailsFilesChips" class="response-files-chips"></div>
+                </div>
               </div>
             </div>
           </div>

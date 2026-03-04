@@ -1,6 +1,7 @@
 import json
 import os
 import uuid
+import base64
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,13 @@ SNAPSHOTS_DIR = BASE_DIR / 'data' / 'snapshots'
 SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_DIR = BASE_DIR / 'services' / 'website'
 load_dotenv(BASE_DIR / '.env')
+SUPPORTED_TEXT_ATTACHMENT_EXTENSIONS = {
+    'c', 'cpp', 'cs', 'css', 'csv', 'go', 'html', 'java', 'js', 'json',
+    'md', 'php', 'py', 'rb', 'sh', 'tex', 'ts', 'txt', 'xml',
+}
+SUPPORTED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif'}
+SUPPORTED_FILE_ATTACHMENT_EXTENSIONS = {'pdf'}
+MAX_TEXT_ATTACHMENT_CHARS = 200_000
 
 
 class SnapshotRequest(BaseModel):
@@ -39,6 +47,7 @@ class ChatRequest(BaseModel):
     system_prompt: str = Field(default='')
     message: str = Field(min_length=1)
     history_messages: list[dict[str, str]] = Field(default_factory=list)
+    attachments: list[dict[str, str]] = Field(default_factory=list)
 
 
 class UsageDto(BaseModel):
@@ -92,18 +101,6 @@ def estimate_cost(usage: UsageDto, pricing: dict[str, float]) -> CostDto:
     )
 
 
-def normalize_text_content(content: Any) -> str:
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        chunks: list[str] = []
-        for item in content:
-            if isinstance(item, dict) and item.get('type') == 'text' and isinstance(item.get('text'), str):
-                chunks.append(item['text'])
-        return ''.join(chunks)
-    return ''
-
-
 def normalize_history_messages(items: list[dict[str, str]] | None) -> list[dict[str, str]]:
     if not items:
         return []
@@ -118,6 +115,140 @@ def normalize_history_messages(items: list[dict[str, str]] | None) -> list[dict[
             continue
         normalized.append({'role': role, 'content': content})
     return normalized
+
+
+def get_field(obj: Any, key: str, default: Any = None) -> Any:
+    if obj is None:
+        return default
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+    return getattr(obj, key, default)
+
+
+def normalize_attachment_items(items: list[dict[str, str]] | None) -> list[dict[str, str]]:
+    if not items:
+        return []
+
+    normalized: list[dict[str, str]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        filename = str(item.get('filename', '')).strip()
+        file_data = str(item.get('file_data', '')).strip()
+        if not filename or not file_data:
+            continue
+        extension = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+        if extension in SUPPORTED_IMAGE_EXTENSIONS:
+            attachment_kind = 'image'
+        elif extension in SUPPORTED_FILE_ATTACHMENT_EXTENSIONS:
+            attachment_kind = 'file'
+        elif extension in SUPPORTED_TEXT_ATTACHMENT_EXTENSIONS:
+            attachment_kind = 'text'
+        else:
+            allowed_exts = ', '.join(
+                sorted(SUPPORTED_TEXT_ATTACHMENT_EXTENSIONS | SUPPORTED_IMAGE_EXTENSIONS | SUPPORTED_FILE_ATTACHMENT_EXTENSIONS)
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f'Unsupported attachment type for "{filename}". Allowed extensions: {allowed_exts}.',
+            )
+        mime_type = str(item.get('mime_type', '')).strip()
+        if not file_data.startswith('data:'):
+            resolved_mime = mime_type or 'application/octet-stream'
+            file_data = f'data:{resolved_mime};base64,{file_data}'
+        normalized.append({'filename': filename, 'file_data': file_data, 'mime_type': mime_type, 'kind': attachment_kind})
+    return normalized
+
+
+def decode_attachment_text(file_data: str) -> str:
+    payload = file_data
+    if file_data.startswith('data:'):
+        if ',' not in file_data:
+            raise HTTPException(status_code=400, detail='Attachment data URL is invalid.')
+        payload = file_data.split(',', 1)[1]
+    try:
+        decoded = base64.b64decode(payload, validate=False)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail='Attachment base64 payload is invalid.') from exc
+    return decoded.decode('utf-8', errors='replace')
+
+
+def build_responses_input(messages: list[dict[str, str]], attachments: list[dict[str, str]] | None = None) -> list[dict[str, Any]]:
+    response_input: list[dict[str, Any]] = []
+    last_user_index = -1
+    for index, message in enumerate(messages):
+        if str(message.get('role', '')).strip() == 'user':
+            last_user_index = index
+
+    normalized_attachments = normalize_attachment_items(attachments)
+    for index, message in enumerate(messages):
+        role = str(message.get('role', '')).strip()
+        content = str(message.get('content', ''))
+        if not role or not content:
+            continue
+        content_type = 'output_text' if role == 'assistant' else 'input_text'
+        content_items: list[dict[str, str]] = [{'type': content_type, 'text': content}]
+        if normalized_attachments and role == 'user' and index == last_user_index:
+            for attachment in normalized_attachments:
+                if attachment.get('kind') == 'image':
+                    content_items.append({'type': 'input_image', 'image_url': attachment['file_data'], 'detail': 'auto'})
+                elif attachment.get('kind') == 'text':
+                    attachment_text = decode_attachment_text(attachment['file_data'])
+                    if len(attachment_text) > MAX_TEXT_ATTACHMENT_CHARS:
+                        attachment_text = attachment_text[:MAX_TEXT_ATTACHMENT_CHARS]
+                    content_items.append(
+                        {
+                            'type': 'input_text',
+                            'text': f'Attachment ({attachment["filename"]}):\n{attachment_text}',
+                        }
+                    )
+                else:
+                    content_items.append(
+                        {
+                            'type': 'input_file',
+                            'filename': attachment['filename'],
+                            'file_data': attachment['file_data'],
+                        }
+                    )
+        response_input.append({'role': role, 'content': content_items})
+    return response_input
+
+
+def extract_response_text(response: Any) -> str:
+    output_text = get_field(response, 'output_text', '')
+    if isinstance(output_text, str) and output_text:
+        return output_text
+
+    chunks: list[str] = []
+    output_items = get_field(response, 'output', [])
+    if not isinstance(output_items, list):
+        return ''
+    for output_item in output_items:
+        content_items = get_field(output_item, 'content', [])
+        if not isinstance(content_items, list):
+            continue
+        for content_item in content_items:
+            text = get_field(content_item, 'text', None)
+            if isinstance(text, str) and text:
+                chunks.append(text)
+    return ''.join(chunks)
+
+
+def map_usage_from_response(response: Any) -> UsageDto:
+    usage_data = get_field(response, 'usage', None)
+    raw_input_tokens = int(get_field(usage_data, 'input_tokens', 0) or 0)
+    input_details = get_field(usage_data, 'input_tokens_details', None)
+    input_cached = int(get_field(input_details, 'cached_tokens', 0) or 0)
+    output_tokens = int(get_field(usage_data, 'output_tokens', 0) or 0)
+    total_tokens = int(get_field(usage_data, 'total_tokens', raw_input_tokens + output_tokens) or 0)
+
+    return UsageDto(
+        input_tokens=raw_input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        input_cached_tokens=input_cached,
+        input_non_cached_tokens=max(0, raw_input_tokens - input_cached),
+    )
 
 
 def utc_now_iso() -> str:
@@ -165,6 +296,7 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
         messages.append({'role': 'system', 'content': system_prompt})
     messages.extend(normalize_history_messages(payload.history_messages))
     messages.append({'role': 'user', 'content': user_message})
+    responses_input = build_responses_input(messages, payload.attachments)
 
     try:
         if payload.provider == 'openai':
@@ -181,7 +313,7 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
                 raise HTTPException(status_code=500, detail='Missing OPENAI_API_KEY.')
 
             client = OpenAI(api_key=api_key)
-            completion = client.chat.completions.create(model=payload.model, messages=messages)
+            response = client.responses.create(model=payload.model, input=responses_input)
             model_name = payload.model
 
         else:
@@ -204,7 +336,7 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
 
             model_name = str(deployment_cfg.get('model', '')).strip() or payload.deployment
             client = AzureOpenAI(api_key=api_key, azure_endpoint=endpoint, api_version=api_version)
-            completion = client.chat.completions.create(model=payload.deployment, messages=messages)
+            response = client.responses.create(model=payload.deployment, input=responses_input)
     except HTTPException:
         raise
     except Exception as exc:
@@ -216,20 +348,10 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
             ) from exc
         raise HTTPException(status_code=502, detail=f'Provider call failed: {error_message}') from exc
 
-    raw_input_tokens = int(getattr(completion.usage, 'prompt_tokens', 0) or 0)
-    prompt_details = getattr(completion.usage, 'prompt_tokens_details', None)
-    input_cached = int(getattr(prompt_details, 'cached_tokens', 0) or 0)
-    usage = UsageDto(
-        input_tokens=raw_input_tokens,
-        output_tokens=int(getattr(completion.usage, 'completion_tokens', 0) or 0),
-        total_tokens=int(getattr(completion.usage, 'total_tokens', 0) or 0),
-        input_cached_tokens=input_cached,
-        input_non_cached_tokens=raw_input_tokens - input_cached,
-    )
-
+    usage = map_usage_from_response(response)
     pricing = get_pricing(provider_cfg, model_name)
     cost = estimate_cost(usage, pricing)
-    content = normalize_text_content(getattr(completion.choices[0].message, 'content', ''))
+    content = extract_response_text(response)
     responded_at = utc_now_iso()
 
     return {
@@ -242,7 +364,7 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
             'resolved_model': model_name,
         },
         'llm_messages': messages,
-        'llm_response': completion.model_dump(),
+        'llm_response': response.model_dump(),
         'answer': content,
         'usage': usage.model_dump(),
         'cost': cost.model_dump(),

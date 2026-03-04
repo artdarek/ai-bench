@@ -1,6 +1,10 @@
 const STORAGE_KEY = 'aibench_history_v1';
 const UI_PREFS_KEY = 'aibench_ui_prefs_v1';
 const SNAPSHOTS_LIST_KEY = 'aibench_snapshots_list_v1';
+const ATTACHMENTS_DB_NAME = 'aibench_attachments_db';
+const ATTACHMENTS_DB_VERSION = 1;
+const ATTACHMENTS_STORE = 'attachments_store';
+const ATTACHMENTS_CACHE_KEY = 'attachments_cache_v1';
 const STORAGE_KEYS = {
   llmProvider: 'llm_provider',
   llmModel: 'llm_model',
@@ -13,10 +17,30 @@ const DEFAULT_SYSTEM_PROMPT =
   'You are a friendly and polite assistant. Be warm, helpful, and concise in your responses.';
 const DEFAULT_MESSAGE = 'How are you?';
 const DEFAULT_HISTORY_MESSAGE_LIMIT = 10;
+const MAX_ATTACHMENT_COUNT = 8;
+const MAX_ATTACHMENT_SIZE_BYTES = 8 * 1024 * 1024;
+const MAX_TOTAL_ATTACHMENTS_SIZE_BYTES = 20 * 1024 * 1024;
+const SUPPORTED_DOCUMENT_EXTENSIONS = new Set([
+  'c', 'cpp', 'cs', 'css', 'csv', 'go', 'html', 'java', 'js', 'json',
+  'md', 'pdf', 'php', 'py', 'rb', 'sh', 'tex', 'ts', 'txt', 'xml',
+]);
+const SUPPORTED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif']);
 
 const MAX_COMPARE = 10;
 const MAIN_TAB_PARAM = 'tab';
 const VALID_MAIN_TABS = new Set(['response', 'chat', 'history', 'charts']);
+const CHART_PANEL_IDS = ['chartsWrap1', 'chartsWrap2', 'chartsWrap3', 'chartsWrap4', 'chartsWrap5', 'chartsWrap6', 'chartsWrap7', 'chartsWrap8'];
+const CHART_PANEL_LABELS = {
+  chartsWrap1: 'Tokens',
+  chartsWrap2: 'Attachments Size',
+  chartsWrap3: 'Files',
+  chartsWrap4: 'Cost',
+  chartsWrap5: 'Characters',
+  chartsWrap6: 'Response Time',
+  chartsWrap7: 'Cumulative Token Usage',
+  chartsWrap8: 'Cumulative Cost',
+};
+let attachmentsDbPromise = null;
 
 const state = {
   config: null,
@@ -32,7 +56,13 @@ const state = {
   chartInstance2: null,
   chartInstance3: null,
   chartInstance4: null,
+  chartInstance5: null,
+  chartInstance6: null,
+  chartInstance7: null,
+  chartInstance8: null,
+  chartDraggedPanelId: null,
   snapshotSaved: false,
+  attachments: [],
 };
 
 const el = {
@@ -47,6 +77,13 @@ const el = {
   includeConversationHistory: document.getElementById('includeConversationHistory'),
   historyMessageLimit: document.getElementById('historyMessageLimit'),
   message: document.getElementById('message'),
+  attachmentsInput: document.getElementById('attachmentsInput'),
+  attachmentsList: document.getElementById('attachmentsList'),
+  attachmentsActionsRow: document.getElementById('attachmentsActionsRow'),
+  attachmentsActiveCountPill: document.getElementById('attachmentsActiveCountPill'),
+  attachmentsSelectAll: document.getElementById('attachmentsSelectAll'),
+  clearAttachmentsBtn: document.getElementById('clearAttachmentsBtn'),
+  keepAttachmentsAfterSend: document.getElementById('keepAttachmentsAfterSend'),
   keepMessageAfterSend: document.getElementById('keepMessageAfterSend'),
   sendBtn: document.getElementById('sendBtn'),
   headerSaveBtn: document.getElementById('headerSaveBtn'),
@@ -87,6 +124,8 @@ const el = {
   contextWindowMessages: document.getElementById('contextWindowMessages'),
   responseRequestedAt: document.getElementById('responseRequestedAt'),
   responseRespondedAt: document.getElementById('responseRespondedAt'),
+  responseFilesBox: document.getElementById('responseFilesBox'),
+  responseFilesChips: document.getElementById('responseFilesChips'),
   systemPromptChars: document.getElementById('systemPromptChars'),
   contextChars: document.getElementById('contextChars'),
   messageChars: document.getElementById('messageChars'),
@@ -115,6 +154,7 @@ const el = {
   historyDetailsMessageChars: document.getElementById('historyDetailsMessageChars'),
   historyDetailsOutputChars: document.getElementById('historyDetailsOutputChars'),
   historyDetailsRawJsonChars: document.getElementById('historyDetailsRawJsonChars'),
+  historyDetailsFilesChips: document.getElementById('historyDetailsFilesChips'),
   historyDetailsInputTokens: document.getElementById('historyDetailsInputTokens'),
   historyDetailsInputCacheBreakdown: document.getElementById('historyDetailsInputCacheBreakdown'),
   historyDetailsInputCachedTokens: document.getElementById('historyDetailsInputCachedTokens'),
@@ -160,20 +200,33 @@ const el = {
   settingsRemoveKeyBtn: document.getElementById('settingsRemoveKeyBtn'),
   settingsCancelBtn: document.getElementById('settingsCancelBtn'),
   settingsSaveBtn: document.getElementById('settingsSaveBtn'),
-  chartSelect: document.getElementById('chartSelect'),
   mainChart: document.getElementById('mainChart'),
   mainChart2: document.getElementById('mainChart2'),
   mainChart3: document.getElementById('mainChart3'),
   mainChart4: document.getElementById('mainChart4'),
+  mainChart5: document.getElementById('mainChart5'),
+  mainChart6: document.getElementById('mainChart6'),
+  mainChart7: document.getElementById('mainChart7'),
+  mainChart8: document.getElementById('mainChart8'),
   chartLabel: document.getElementById('chartLabel'),
   chartLabel2: document.getElementById('chartLabel2'),
   chartLabel3: document.getElementById('chartLabel3'),
   chartLabel4: document.getElementById('chartLabel4'),
+  chartLabel5: document.getElementById('chartLabel5'),
+  chartLabel6: document.getElementById('chartLabel6'),
+  chartLabel7: document.getElementById('chartLabel7'),
+  chartLabel8: document.getElementById('chartLabel8'),
   chartsEmpty: document.getElementById('chartsEmpty'),
+  chartsVisibilityToggles: document.getElementById('chartsVisibilityToggles'),
   chartsWrap: document.getElementById('chartsWrap'),
+  chartsWrap1: document.getElementById('chartsWrap1'),
   chartsWrap2: document.getElementById('chartsWrap2'),
   chartsWrap3: document.getElementById('chartsWrap3'),
   chartsWrap4: document.getElementById('chartsWrap4'),
+  chartsWrap5: document.getElementById('chartsWrap5'),
+  chartsWrap6: document.getElementById('chartsWrap6'),
+  chartsWrap7: document.getElementById('chartsWrap7'),
+  chartsWrap8: document.getElementById('chartsWrap8'),
 };
 
 init().catch((error) => setStatus(`Initialization error: ${error.message}`, 'error'));
@@ -279,10 +332,12 @@ async function init() {
   setupProviderOptions();
   applyDefaultPrompts();
   applyUiPreferences();
+  state.attachments = await loadAttachmentsCache();
   applyHistoryView();
   setResponseHasData(false);
   setResponseLoading(false);
   renderHistory();
+  renderChartVisibilityControls();
 
   el.provider.addEventListener('change', onProviderChange);
   el.model.addEventListener('change', () => localStorage.setItem(STORAGE_KEYS.llmModel, el.model.value));
@@ -290,6 +345,12 @@ async function init() {
   el.systemPrompt.addEventListener('input', updateSystemPromptCharPill);
   el.message.addEventListener('input', updateMessageCharPill);
   el.message.addEventListener('input', resizeMessageInput);
+  el.attachmentsInput.addEventListener('change', onAttachmentsSelected);
+  el.attachmentsList.addEventListener('click', onAttachmentListClick);
+  el.attachmentsList.addEventListener('change', onAttachmentListChange);
+  el.attachmentsSelectAll.addEventListener('change', onAttachmentsSelectAllChange);
+  el.clearAttachmentsBtn.addEventListener('click', clearAttachments);
+  el.keepAttachmentsAfterSend.addEventListener('change', onKeepAttachmentsAfterSendChange);
   el.includeConversationHistory.addEventListener('change', onHistoryToggleChange);
   el.historyMessageLimit.addEventListener('change', onHistoryMessageLimitChange);
   el.historyMessageLimit.addEventListener('input', onHistoryMessageLimitChange);
@@ -311,7 +372,12 @@ async function init() {
   });
   el.mainTabButtons.forEach((button) => button.addEventListener('click', onMainTabClick));
   el.historyTabButtons.forEach((button) => button.addEventListener('click', onHistoryTabClick));
-  el.chartSelect.addEventListener('change', renderChart);
+  el.chartsWrap.addEventListener('click', onChartsWrapClick);
+  el.chartsVisibilityToggles.addEventListener('change', onChartVisibilityToggleChange);
+  el.chartsWrap.addEventListener('dragstart', onChartsWrapDragStart);
+  el.chartsWrap.addEventListener('dragover', onChartsWrapDragOver);
+  el.chartsWrap.addEventListener('drop', onChartsWrapDrop);
+  el.chartsWrap.addEventListener('dragend', onChartsWrapDragEnd);
   el.compareBtn.addEventListener('click', openCompareModal);
   el.deleteSelectedBtn.addEventListener('click', openDeleteSelectedConfirmModal);
   el.exportSelectedBtn.addEventListener('click', exportSelectedCsv);
@@ -417,6 +483,8 @@ async function init() {
   resizeMessageInput();
   updateSystemPromptCharPill();
   updateMessageCharPill();
+  renderAttachments();
+  renderResponseFiles([]);
   setMainTab(openedFromSnapshot ? 'history' : getMainTabFromUrl(), { updateUrl: false });
   updateSettingsModalState();
   updateKeyIndicator();
@@ -746,11 +814,18 @@ async function onSend() {
   const systemPromptChars = countChars(el.systemPrompt.value);
   const contextChars = historyContext.messages.reduce((sum, msg) => sum + countChars(msg.content), 0);
   const messageChars = countChars(message);
+  const selectedAttachments = state.attachments.filter((item) => item.enabled !== false);
+  const requestAttachments = selectedAttachments.map((item) => ({ name: item.name, size: item.size }));
   const body = {
     provider,
     system_prompt: el.systemPrompt.value,
     message,
     history_messages: historyContext.messages,
+    attachments: selectedAttachments.map((item) => ({
+      filename: item.name,
+      mime_type: item.mimeType,
+      file_data: item.fileData,
+    })),
   };
 
   if (provider === 'openai') {
@@ -814,6 +889,7 @@ async function onSend() {
     el.outputChars.textContent = String(outputChars);
     el.contextMessagesCount.textContent = String(historyContext.contextMessagesCount);
     el.contextWindowMessages.textContent = String(historyContext.contextWindowMessages);
+    renderResponseFiles(requestAttachments);
 
     const historyEntry = {
       id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -838,6 +914,7 @@ async function onSend() {
       messageChars,
       outputChars,
       rawJsonChars,
+      attachments: requestAttachments,
     };
 
     state.history = [...state.history, historyEntry].slice(-MAX_HISTORY);
@@ -848,6 +925,9 @@ async function onSend() {
     renderChatView();
     if (!el.keepMessageAfterSend?.checked) {
       el.message.value = '';
+    }
+    if (!el.keepAttachmentsAfterSend?.checked) {
+      clearAttachments();
     }
     resizeMessageInput();
     updateMessageCharPill();
@@ -875,6 +955,18 @@ function renderHistory() {
     .map(
       (item) => {
         const isChecked = state.compareSelection.has(item.id);
+        const files = Array.isArray(item.attachments) ? item.attachments : [];
+        const filesMarkup = files.length
+          ? files
+              .map(
+                (file) => `<span class="badge response-time-badge response-file-chip">
+                  <i class="bi bi-paperclip" aria-hidden="true"></i>
+                  <span class="response-file-name" title="${escapeHtml(file.name || 'file')}">${escapeHtml(file.name || 'file')}</span>
+                  <span class="response-file-size">${formatBytes(file.size || 0)}</span>
+                </span>`
+              )
+              .join('')
+          : '<span class="badge response-time-badge">No files attached.</span>';
         return `<div class="history-item-wrap">
         <input class="form-check-input history-compare-cb history-compare-cb-outer" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''} title="Select for comparison" aria-label="Select run for comparison">
         <article class="history-item${isChecked ? ' history-item-selected' : ''}">
@@ -936,6 +1028,10 @@ function renderHistory() {
             <span class="badge response-token-badge">Messages included: <strong class="ms-1">${item.contextMessagesCount ?? item.contextPairsCount ?? 0}</strong></span>
             <span class="badge response-time-badge">Window set: <strong class="ms-1">${item.contextWindowMessages ?? 0}</strong></span>
           </div>
+        </div>
+        <div class="history-files-card usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
+          <h4 class="usage-card-title mb-0">Files</h4>
+          <div class="response-files-chips">${filesMarkup}</div>
         </div>
         <div class="history-chars-row usage-card d-flex align-items-center justify-content-between gap-2 mt-2">
           <h4 class="usage-card-title mb-0">Characters</h4>
@@ -1059,6 +1155,168 @@ function persistUiPrefs() {
   localStorage.setItem(UI_PREFS_KEY, JSON.stringify(state.uiPrefs || {}));
 }
 
+function getChartCollapsePrefs() {
+  const value = state.uiPrefs?.chartPanelsCollapsed;
+  return value && typeof value === 'object' ? value : {};
+}
+
+function getChartPanelOrderPrefs() {
+  const value = state.uiPrefs?.chartPanelOrder;
+  return Array.isArray(value) ? value : [];
+}
+
+function getChartVisibilityPrefs() {
+  const value = state.uiPrefs?.chartPanelsVisible;
+  return value && typeof value === 'object' ? value : {};
+}
+
+function normalizeChartPanelOrder(order) {
+  const candidate = Array.isArray(order) ? order : [];
+  const unique = [];
+  for (const id of candidate) {
+    if (CHART_PANEL_IDS.includes(id) && !unique.includes(id)) {
+      unique.push(id);
+    }
+  }
+  for (const id of CHART_PANEL_IDS) {
+    if (!unique.includes(id)) {
+      unique.push(id);
+    }
+  }
+  return unique;
+}
+
+function isChartPanelCollapsed(panelId) {
+  return Boolean(getChartCollapsePrefs()[panelId]);
+}
+
+function isChartPanelVisible(panelId) {
+  const prefs = getChartVisibilityPrefs();
+  if (Object.prototype.hasOwnProperty.call(prefs, panelId)) {
+    return Boolean(prefs[panelId]);
+  }
+  return true;
+}
+
+function setChartPanelCollapsed(panelId, collapsed) {
+  if (!panelId) return;
+  state.uiPrefs.chartPanelsCollapsed = {
+    ...getChartCollapsePrefs(),
+    [panelId]: Boolean(collapsed),
+  };
+  persistUiPrefs();
+}
+
+function setChartPanelVisible(panelId, visible) {
+  if (!panelId) return;
+  state.uiPrefs.chartPanelsVisible = {
+    ...getChartVisibilityPrefs(),
+    [panelId]: Boolean(visible),
+  };
+  persistUiPrefs();
+}
+
+function getAttachmentsDb() {
+  if (!window.indexedDB) {
+    return Promise.resolve(null);
+  }
+  if (attachmentsDbPromise) {
+    return attachmentsDbPromise;
+  }
+  attachmentsDbPromise = new Promise((resolve) => {
+    const request = indexedDB.open(ATTACHMENTS_DB_NAME, ATTACHMENTS_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(ATTACHMENTS_STORE)) {
+        db.createObjectStore(ATTACHMENTS_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+  return attachmentsDbPromise;
+}
+
+function dbGet(db, key) {
+  return new Promise((resolve) => {
+    const tx = db.transaction(ATTACHMENTS_STORE, 'readonly');
+    const store = tx.objectStore(ATTACHMENTS_STORE);
+    const request = store.get(key);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+function dbPut(db, key, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(ATTACHMENTS_STORE, 'readwrite');
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed.'));
+    tx.objectStore(ATTACHMENTS_STORE).put(value, key);
+  });
+}
+
+function dbDelete(db, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(ATTACHMENTS_STORE, 'readwrite');
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('IndexedDB delete failed.'));
+    tx.objectStore(ATTACHMENTS_STORE).delete(key);
+  });
+}
+
+function normalizeCachedAttachments(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      id: String(item.id || `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),
+      name: String(item.name || '').trim(),
+      size: Number(item.size || 0),
+      type: String(item.type || 'application/octet-stream'),
+      mimeType: String(item.mimeType || item.type || 'application/octet-stream'),
+      lastModified: Number(item.lastModified || 0),
+      fileData: String(item.fileData || ''),
+      enabled: item.enabled !== false,
+    }))
+    .filter((item) => item.name && item.fileData);
+}
+
+async function loadAttachmentsCache() {
+  try {
+    const db = await getAttachmentsDb();
+    if (!db) return [];
+    const cached = await dbGet(db, ATTACHMENTS_CACHE_KEY);
+    return normalizeCachedAttachments(cached);
+  } catch {
+    return [];
+  }
+}
+
+async function persistAttachmentsCache() {
+  try {
+    const db = await getAttachmentsDb();
+    if (!db) return;
+    if (!state.attachments.length) {
+      await dbDelete(db, ATTACHMENTS_CACHE_KEY);
+      return;
+    }
+    const payload = state.attachments.map((item) => ({
+      id: item.id,
+      name: item.name,
+      size: item.size,
+      type: item.type,
+      mimeType: item.mimeType,
+      lastModified: item.lastModified,
+      fileData: item.fileData,
+      enabled: item.enabled !== false,
+    }));
+    await dbPut(db, ATTACHMENTS_CACHE_KEY, payload);
+  } catch {
+    // Ignore storage errors (quota/private mode), runtime behavior remains unchanged.
+  }
+}
+
 function loadSnapshotsList() {
   try {
     return JSON.parse(localStorage.getItem(SNAPSHOTS_LIST_KEY)) || [];
@@ -1083,6 +1341,9 @@ function applyUiPreferences() {
   if (typeof state.uiPrefs?.keepMessageAfterSend === 'boolean') {
     el.keepMessageAfterSend.checked = state.uiPrefs.keepMessageAfterSend;
   }
+  if (typeof state.uiPrefs?.keepAttachmentsAfterSend === 'boolean') {
+    el.keepAttachmentsAfterSend.checked = state.uiPrefs.keepAttachmentsAfterSend;
+  }
   if (typeof state.uiPrefs?.includeConversationHistory === 'boolean') {
     el.includeConversationHistory.checked = state.uiPrefs.includeConversationHistory;
   }
@@ -1093,6 +1354,11 @@ function applyUiPreferences() {
 
 function onKeepMessageAfterSendChange() {
   state.uiPrefs.keepMessageAfterSend = Boolean(el.keepMessageAfterSend?.checked);
+  persistUiPrefs();
+}
+
+function onKeepAttachmentsAfterSendChange() {
+  state.uiPrefs.keepAttachmentsAfterSend = Boolean(el.keepAttachmentsAfterSend?.checked);
   persistUiPrefs();
 }
 
@@ -1299,40 +1565,56 @@ function buildCsvContent(items) {
     'contextChars',
     'messageChars',
     'outputChars',
+    'attachmentsCount',
+    'attachmentsTotalKb',
+    'attachmentsTotalMb',
+    'attachmentNames',
     'systemPrompt',
     'message',
     'answer',
   ];
 
-  const rows = items.map((item) => [
-    item.id,
-    item.createdAt,
-    item.requested_at,
-    item.responded_at,
-    item.provider,
-    item.model,
-    item.deployment,
-    item.usage?.input_tokens ?? '',
-    item.usage?.input_cached_tokens ?? '',
-    item.usage?.input_non_cached_tokens ?? '',
-    item.usage?.output_tokens ?? '',
-    item.usage?.total_tokens ?? '',
-    item.cost?.input_cost_usd ?? '',
-    item.cost?.input_non_cached_cost_usd ?? '',
-    item.cost?.input_cached_cost_usd ?? '',
-    item.cost?.output_cost_usd ?? '',
-    item.cost?.total_cost_usd ?? '',
-    item.responseTimeMs ?? '',
-    item.contextMessagesCount ?? item.contextPairsCount ?? '',
-    item.contextWindowMessages ?? '',
-    item.systemPromptChars ?? countChars(item.systemPrompt || ''),
-    getContextChars(item),
-    item.messageChars ?? '',
-    item.outputChars ?? '',
-    item.systemPrompt,
-    item.message,
-    item.answer,
-  ]);
+  const rows = items.map((item) => {
+    const attachments = getEntryAttachments(item);
+    const attachmentsCount = attachments.length;
+    const attachmentsTotalBytes = getEntryAttachmentsTotalBytes(item);
+    const attachmentsTotalKb = (attachmentsTotalBytes / 1024).toFixed(1);
+    const attachmentsTotalMb = (attachmentsTotalBytes / (1024 * 1024)).toFixed(2);
+    const attachmentNames = attachments.map((file) => file?.name || 'file').join('; ');
+    return [
+      item.id,
+      item.createdAt,
+      item.requested_at,
+      item.responded_at,
+      item.provider,
+      item.model,
+      item.deployment,
+      item.usage?.input_tokens ?? '',
+      item.usage?.input_cached_tokens ?? '',
+      item.usage?.input_non_cached_tokens ?? '',
+      item.usage?.output_tokens ?? '',
+      item.usage?.total_tokens ?? '',
+      item.cost?.input_cost_usd ?? '',
+      item.cost?.input_non_cached_cost_usd ?? '',
+      item.cost?.input_cached_cost_usd ?? '',
+      item.cost?.output_cost_usd ?? '',
+      item.cost?.total_cost_usd ?? '',
+      item.responseTimeMs ?? '',
+      item.contextMessagesCount ?? item.contextPairsCount ?? '',
+      item.contextWindowMessages ?? '',
+      item.systemPromptChars ?? countChars(item.systemPrompt || ''),
+      getContextChars(item),
+      item.messageChars ?? '',
+      item.outputChars ?? '',
+      attachmentsCount,
+      attachmentsTotalKb,
+      attachmentsTotalMb,
+      attachmentNames,
+      item.systemPrompt,
+      item.message,
+      item.answer,
+    ];
+  });
 
   return [header, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n');
 }
@@ -1375,10 +1657,246 @@ function exportSelectedCsv() {
 
 function toggleBusy(isBusy) {
   el.sendBtn.disabled = isBusy;
+  el.attachmentsInput.disabled = isBusy;
+  el.attachmentsSelectAll.disabled = isBusy || state.attachments.length === 0;
+  el.clearAttachmentsBtn.disabled = isBusy;
   el.exportBtn.disabled = isBusy;
   el.headerExportBtn.disabled = isBusy || !state.history.length;
   el.headerClearBtn.disabled = isBusy || !state.history.length;
   el.headerSettingsBtn.disabled = isBusy;
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0;
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function formatChatFilesSize(bytes) {
+  const value = Number(bytes) || 0;
+  const kb = value / 1024;
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`;
+  }
+  return `${(kb / 1024).toFixed(2)} MB`;
+}
+
+function getEntryAttachments(entry) {
+  return Array.isArray(entry?.attachments) ? entry.attachments : [];
+}
+
+function getEntryAttachmentsTotalBytes(entry) {
+  return getEntryAttachments(entry).reduce((sum, file) => sum + Number(file?.size || 0), 0);
+}
+
+function formatEntryAttachmentsList(entry) {
+  const files = getEntryAttachments(entry);
+  if (!files.length) {
+    return '-';
+  }
+  return files
+    .map((file) => `${file.name || 'file'} (${formatBytes(file.size || 0)})`)
+    .join('; ');
+}
+
+function getFileExtension(filename) {
+  const raw = String(filename || '').trim().toLowerCase();
+  const dot = raw.lastIndexOf('.');
+  if (dot <= 0 || dot === raw.length - 1) return '';
+  return raw.slice(dot + 1);
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(String(reader.result || ''));
+    };
+    reader.onerror = () => reject(new Error(`Could not read file: ${file.name}`));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderAttachments() {
+  const count = state.attachments.length;
+  const activeCount = state.attachments.filter((item) => item.enabled !== false).length;
+  if (el.attachmentsActiveCountPill) {
+    el.attachmentsActiveCountPill.textContent = String(activeCount);
+  }
+  if (el.attachmentsActionsRow) {
+    el.attachmentsActionsRow.classList.toggle('hidden', count === 0);
+  }
+  if (el.attachmentsSelectAll) {
+    el.attachmentsSelectAll.disabled = count === 0;
+    el.attachmentsSelectAll.checked = count > 0 && activeCount === count;
+    el.attachmentsSelectAll.indeterminate = activeCount > 0 && activeCount < count;
+  }
+  el.clearAttachmentsBtn.classList.toggle('hidden', count === 0);
+  if (!count) {
+    el.attachmentsList.innerHTML = '';
+    return;
+  }
+  el.attachmentsList.innerHTML = state.attachments
+    .map(
+      (item) => `<div class="attachment-row${item.enabled === false ? ' is-disabled' : ''}">
+        <input class="form-check-input attachment-row-toggle" type="checkbox" data-attachment-id="${item.id}"${item.enabled === false ? '' : ' checked'} />
+        <div class="attachment-row-main">
+          <i class="bi bi-file-earmark-text attachment-row-icon" aria-hidden="true"></i>
+          <span class="attachment-row-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+          <span class="attachment-row-size">(${formatBytes(item.size)})</span>
+        </div>
+        <button class="attachment-row-remove" type="button" data-attachment-id="${item.id}" title="Remove attachment">
+          <i class="bi bi-trash3" aria-hidden="true"></i>
+        </button>
+      </div>`
+    )
+    .join('');
+}
+
+function clearAttachments() {
+  state.attachments = [];
+  el.attachmentsInput.value = '';
+  renderAttachments();
+  void persistAttachmentsCache();
+}
+
+function onAttachmentListClick(event) {
+  const button = event.target.closest('[data-attachment-id]');
+  if (!button) return;
+  if (button.classList.contains('attachment-row-toggle')) {
+    return;
+  }
+  const attachmentId = button.dataset.attachmentId;
+  state.attachments = state.attachments.filter((item) => item.id !== attachmentId);
+  renderAttachments();
+  void persistAttachmentsCache();
+}
+
+function onAttachmentListChange(event) {
+  const checkbox = event.target.closest('.attachment-row-toggle[data-attachment-id]');
+  if (!checkbox) return;
+  const attachmentId = checkbox.dataset.attachmentId;
+  state.attachments = state.attachments.map((item) =>
+    item.id === attachmentId ? { ...item, enabled: Boolean(checkbox.checked) } : item
+  );
+  renderAttachments();
+  void persistAttachmentsCache();
+}
+
+function onAttachmentsSelectAllChange(event) {
+  const enabled = Boolean(event.target?.checked);
+  state.attachments = state.attachments.map((item) => ({ ...item, enabled }));
+  renderAttachments();
+  void persistAttachmentsCache();
+}
+
+function renderResponseFiles(files) {
+  const list = Array.isArray(files) ? files : [];
+  if (!list.length) {
+    el.responseFilesChips.innerHTML = '<span class="badge response-time-badge">No files attached.</span>';
+    return;
+  }
+  el.responseFilesChips.innerHTML = list
+    .map(
+      (file) => `<span class="badge response-time-badge response-file-chip">
+        <i class="bi bi-paperclip" aria-hidden="true"></i>
+        <span class="response-file-name" title="${escapeHtml(file.name || 'file')}">${escapeHtml(file.name || 'file')}</span>
+        <span class="response-file-size">${formatBytes(file.size || 0)}</span>
+      </span>`
+    )
+    .join('');
+}
+
+function renderHistoryDetailsFiles(files) {
+  const list = Array.isArray(files) ? files : [];
+  if (!list.length) {
+    el.historyDetailsFilesChips.innerHTML = '<span class="badge response-time-badge">No files attached.</span>';
+    return;
+  }
+  el.historyDetailsFilesChips.innerHTML = list
+    .map(
+      (file) => `<span class="badge response-time-badge response-file-chip">
+        <i class="bi bi-paperclip" aria-hidden="true"></i>
+        <span class="response-file-name" title="${escapeHtml(file.name || 'file')}">${escapeHtml(file.name || 'file')}</span>
+        <span class="response-file-size">${formatBytes(file.size || 0)}</span>
+      </span>`
+    )
+    .join('');
+}
+
+async function onAttachmentsSelected(event) {
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
+
+  const existingKeys = new Set(state.attachments.map((item) => `${item.name}::${item.size}::${item.lastModified}`));
+  const uniqueFiles = files.filter((file) => !existingKeys.has(`${file.name}::${file.size}::${file.lastModified}`));
+  const availableSlots = Math.max(0, MAX_ATTACHMENT_COUNT - state.attachments.length);
+  const selectedFiles = uniqueFiles.slice(0, availableSlots);
+
+  if (!selectedFiles.length) {
+    setStatus(`Attachment limit reached (${MAX_ATTACHMENT_COUNT}).`, 'warning');
+    el.attachmentsInput.value = '';
+    return;
+  }
+
+  const oversized = selectedFiles.find((file) => file.size > MAX_ATTACHMENT_SIZE_BYTES);
+  if (oversized) {
+    setStatus(
+      `File "${oversized.name}" is too large (${formatBytes(oversized.size)}). Max ${formatBytes(MAX_ATTACHMENT_SIZE_BYTES)} per file.`,
+      'warning'
+    );
+    el.attachmentsInput.value = '';
+    return;
+  }
+
+  const unsupported = selectedFiles.find((file) => {
+    const ext = getFileExtension(file.name);
+    return !SUPPORTED_DOCUMENT_EXTENSIONS.has(ext) && !SUPPORTED_IMAGE_EXTENSIONS.has(ext);
+  });
+  if (unsupported) {
+    const ext = getFileExtension(unsupported.name);
+    const allowed = [...SUPPORTED_DOCUMENT_EXTENSIONS, ...SUPPORTED_IMAGE_EXTENSIONS].join(', ');
+    setStatus(
+      `Unsupported file type "${ext || 'unknown'}" for "${unsupported.name}". Allowed: ${allowed}.`,
+      'warning'
+    );
+    el.attachmentsInput.value = '';
+    return;
+  }
+
+  const currentTotalSize = state.attachments.reduce((sum, item) => sum + (item.size || 0), 0);
+  const selectedTotalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+  if (currentTotalSize + selectedTotalSize > MAX_TOTAL_ATTACHMENTS_SIZE_BYTES) {
+    setStatus(`Total attachments exceed ${formatBytes(MAX_TOTAL_ATTACHMENTS_SIZE_BYTES)}.`, 'warning');
+    el.attachmentsInput.value = '';
+    return;
+  }
+
+  try {
+    const loaded = await Promise.all(
+      selectedFiles.map(async (file) => ({
+        id: `file-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: file.name,
+        size: file.size,
+        type: file.type || 'application/octet-stream',
+        mimeType: file.type || 'application/octet-stream',
+        lastModified: file.lastModified || 0,
+        fileData: await readFileAsBase64(file),
+        enabled: true,
+      }))
+    );
+    state.attachments = [...state.attachments, ...loaded];
+    renderAttachments();
+    void persistAttachmentsCache();
+    if (files.length > selectedFiles.length) {
+      setStatus(`Only ${selectedFiles.length} file(s) added due to limit ${MAX_ATTACHMENT_COUNT}.`, 'warning');
+    }
+  } catch (error) {
+    setStatus(error.message || 'Could not process attachments.', 'error');
+  } finally {
+    el.attachmentsInput.value = '';
+  }
 }
 
 function setResponseLoading(isLoading) {
@@ -1404,7 +1922,7 @@ function setStatus(text, type = 'info') {
     info: 'alert-info',
   }[type] || 'alert-info';
   el.status.textContent = text;
-  el.status.className = `status alert ${alertClass} mt-3`;
+  el.status.className = `status alert ${alertClass} mb-3`;
 }
 
 function formatUsd(value) {
@@ -1561,6 +2079,7 @@ function openHistoryDetailsModal(entry) {
   el.historyDetailsInputCost.textContent = `$${formatUsd(entry.cost?.input_cost_usd ?? 0)}`;
   el.historyDetailsOutputCost.textContent = `$${formatUsd(entry.cost?.output_cost_usd ?? 0)}`;
   el.historyDetailsTotalCost.textContent = `$${formatUsd(entry.cost?.total_cost_usd ?? 0)}`;
+  renderHistoryDetailsFiles(entry.attachments || []);
   el.historyDetailsSystemPrompt.value = entry.systemPrompt || '';
   el.historyDetailsMessage.value = entry.message || '';
   el.historyDetailsLlmMessages.value = JSON.stringify(entry.llmMessages || [], null, 2);
@@ -1772,6 +2291,14 @@ function getCompareMetrics() {
     { label: 'Provider', fn: (e) => e.provider || '-' },
     { label: 'Model / Deployment', fn: (e) => e.deployment || e.model || '-' },
     { label: 'Response Time', fn: (e) => formatResponseTimeMs(e.responseTimeMs), diffValueFn: (e) => Number(e.responseTimeMs ?? 0), diffFormatFn: (v) => formatDurationDiffMs(v) },
+    {
+      label: 'Response Time (ms)',
+      fn: (e) => {
+        const ms = Number(e.responseTimeMs ?? 0);
+        return Number.isFinite(ms) ? String(Math.round(ms)) : '0';
+      },
+      diffValueFn: (e) => Number(e.responseTimeMs ?? 0),
+    },
     { label: 'Context Messages', fn: (e) => String(e.contextMessagesCount ?? e.contextPairsCount ?? 0), diffValueFn: (e) => Number(e.contextMessagesCount ?? e.contextPairsCount ?? 0) },
     { label: 'Context Window Set', fn: (e) => String(e.contextWindowMessages ?? 0), diffValueFn: (e) => Number(e.contextWindowMessages ?? 0) },
     { label: 'System Prompt Chars', fn: (e) => String(getSystemPromptChars(e)), diffValueFn: (e) => Number(getSystemPromptChars(e)) },
@@ -1788,6 +2315,20 @@ function getCompareMetrics() {
     { label: 'Input Cached Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.input_cached_cost_usd ?? 0)}`, diffValueFn: (e) => Number(e.cost?.input_cached_cost_usd ?? 0), diffFormatFn: (v) => formatCurrencyDiff(v) },
     { label: 'Output Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.output_cost_usd ?? 0)}`, diffValueFn: (e) => Number(e.cost?.output_cost_usd ?? 0), diffFormatFn: (v) => formatCurrencyDiff(v) },
     { label: 'Total Cost (USD)', fn: (e) => `$${formatUsd(e.cost?.total_cost_usd ?? 0)}`, diffValueFn: (e) => Number(e.cost?.total_cost_usd ?? 0), diffFormatFn: (v) => formatCurrencyDiff(v) },
+    { label: 'Files', fn: (e) => formatEntryAttachmentsList(e) },
+    { label: 'Files Count', fn: (e) => String(getEntryAttachments(e).length), diffValueFn: (e) => Number(getEntryAttachments(e).length) },
+    {
+      label: 'Files Total (KB)',
+      fn: (e) => `${(getEntryAttachmentsTotalBytes(e) / 1024).toFixed(1)} KB`,
+      diffValueFn: (e) => getEntryAttachmentsTotalBytes(e) / 1024,
+      diffFormatFn: (v) => `${formatCompareDiffValue(v)} KB`,
+    },
+    {
+      label: 'Files Total (MB)',
+      fn: (e) => `${(getEntryAttachmentsTotalBytes(e) / (1024 * 1024)).toFixed(2)} MB`,
+      diffValueFn: (e) => getEntryAttachmentsTotalBytes(e) / (1024 * 1024),
+      diffFormatFn: (v) => `${formatCompareDiffValue(v)} MB`,
+    },
     { label: 'System Prompt', fn: (e) => e.systemPrompt || '' },
     { label: 'Message', fn: (e) => e.message || '' },
     { label: 'Answer', fn: (e) => e.answer || '' },
@@ -1833,6 +2374,22 @@ function formatCompareMetricDiff(metric, value) {
     return metric.diffFormatFn(value);
   }
   return formatCompareDiffValue(value);
+}
+
+function isFileSizeCompareMetric(metricLabel) {
+  return metricLabel === 'Files Total (KB)' || metricLabel === 'Files Total (MB)';
+}
+
+function getFileSizeMetricDecimals(metricLabel) {
+  return metricLabel === 'Files Total (KB)' ? 1 : 2;
+}
+
+function formatCompareCsvSignedNumber(value, decimals) {
+  if (!Number.isFinite(value)) {
+    return '-';
+  }
+  const rounded = Number(value.toFixed(decimals));
+  return rounded > 0 ? `+${rounded}` : String(rounded);
 }
 
 function formatCurrencyDiff(value) {
@@ -1946,7 +2503,13 @@ function exportCompareCsv() {
         const leftValue = Number(metric.diffValueFn(entries[column.leftIndex]));
         const rightValue = Number(metric.diffValueFn(entries[column.rightIndex]));
         const diffValue = Number.isFinite(leftValue) && Number.isFinite(rightValue) ? rightValue - leftValue : NaN;
+        if (isFileSizeCompareMetric(metric.label)) {
+          return formatCompareCsvSignedNumber(diffValue, getFileSizeMetricDecimals(metric.label));
+        }
         return formatCompareMetricDiff(metric, diffValue);
+      }
+      if (isFileSizeCompareMetric(metric.label) && typeof metric.diffValueFn === 'function') {
+        return Number(metric.diffValueFn(entries[column.index])).toFixed(getFileSizeMetricDecimals(metric.label));
       }
       return metric.fn(entries[column.index]);
     });
@@ -2048,6 +2611,13 @@ function renderChatView() {
     const metaParts = [
       `<span class="chat-usage-inline"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Usage: ${escapeHtml(usageText)}</span></span>`,
     ];
+    const attachedFiles = Array.isArray(entry.attachments) ? entry.attachments : [];
+    if (attachedFiles.length) {
+      const totalAttachmentSize = attachedFiles.reduce((sum, file) => sum + Number(file.size || 0), 0);
+      metaParts.push(
+        `<span class="chat-usage-inline"><i class="bi bi-paperclip" aria-hidden="true"></i><span>Files ${attachedFiles.length} / ${escapeHtml(formatChatFilesSize(totalAttachmentSize))}</span></span>`
+      );
+    }
 
     const metaHtml = metaParts.join('<span class="chat-bubble-meta-dot">·</span>');
     const aiRow = document.createElement('div');
@@ -2092,24 +2662,234 @@ function renderChart() {
   if (state.chartInstance2) { state.chartInstance2.destroy(); state.chartInstance2 = null; }
   if (state.chartInstance3) { state.chartInstance3.destroy(); state.chartInstance3 = null; }
   if (state.chartInstance4) { state.chartInstance4.destroy(); state.chartInstance4 = null; }
+  if (state.chartInstance5) { state.chartInstance5.destroy(); state.chartInstance5 = null; }
+  if (state.chartInstance6) { state.chartInstance6.destroy(); state.chartInstance6 = null; }
+  if (state.chartInstance7) { state.chartInstance7.destroy(); state.chartInstance7 = null; }
+  if (state.chartInstance8) { state.chartInstance8.destroy(); state.chartInstance8 = null; }
 
-  const builders = {
-    cumulativeUsage:       buildCumulativeUsageCharts,
-    tokensVsResponseTime:  buildTokensVsResponseTimeCharts,
-  };
-
-  const result = builders[el.chartSelect.value]?.(sorted) ?? null;
+  const result = buildTokensVsResponseTimeCharts(sorted);
   if (Array.isArray(result)) {
-    [state.chartInstance, state.chartInstance2, state.chartInstance3, state.chartInstance4] = result;
+    [state.chartInstance, state.chartInstance2, state.chartInstance3, state.chartInstance4, state.chartInstance5, state.chartInstance6, state.chartInstance7, state.chartInstance8] = result;
     el.chartsWrap2.classList.toggle('hidden', result.length < 2);
     el.chartsWrap3.classList.toggle('hidden', result.length < 3);
     el.chartsWrap4.classList.toggle('hidden', result.length < 4);
+    el.chartsWrap5.classList.toggle('hidden', result.length < 5);
+    el.chartsWrap6.classList.toggle('hidden', result.length < 6);
+    el.chartsWrap7.classList.toggle('hidden', result.length < 7);
+    el.chartsWrap8.classList.toggle('hidden', result.length < 8);
   } else {
     state.chartInstance = result;
     el.chartsWrap2.classList.add('hidden');
     el.chartsWrap3.classList.add('hidden');
     el.chartsWrap4.classList.add('hidden');
+    el.chartsWrap5.classList.add('hidden');
+    el.chartsWrap6.classList.add('hidden');
+    el.chartsWrap7.classList.add('hidden');
+    el.chartsWrap8.classList.add('hidden');
   }
+  applyChartPanelsOrder();
+  applyChartPanelsVisibilityState();
+  applyChartPanelsCollapsedState();
+}
+
+function applyChartPanelsOrder() {
+  if (!el.chartsWrap) return;
+  const order = normalizeChartPanelOrder(getChartPanelOrderPrefs());
+  for (const panelId of order) {
+    const node = document.getElementById(panelId);
+    if (node && node.parentElement === el.chartsWrap) {
+      el.chartsWrap.appendChild(node);
+    }
+  }
+}
+
+function applyChartPanelsVisibilityState() {
+  const wraps = CHART_PANEL_IDS.map((panelId) => document.getElementById(panelId));
+  for (const wrap of wraps) {
+    if (!wrap) continue;
+    const panelId = wrap.id || '';
+    const visible = isChartPanelVisible(panelId);
+    wrap.classList.toggle('hidden', !visible);
+  }
+  updateChartVisibilityControls();
+}
+
+function applyChartPanelsCollapsedState() {
+  const wraps = CHART_PANEL_IDS.map((panelId) => document.getElementById(panelId));
+  for (const wrap of wraps) {
+    if (!wrap) continue;
+    const panelId = wrap.id || '';
+    const inner = wrap.querySelector('.chart-canvas-inner');
+    const toggleBtn = wrap.querySelector('[data-chart-toggle="true"]');
+    if (!inner || !toggleBtn) continue;
+    const collapsed = isChartPanelCollapsed(panelId);
+    inner.classList.toggle('hidden', collapsed);
+    wrap.classList.toggle('chart-canvas-wrap-collapsed', collapsed);
+    syncChartToggleButton(toggleBtn, !collapsed);
+  }
+}
+
+function getRenderedCharts() {
+  return [
+    state.chartInstance,
+    state.chartInstance2,
+    state.chartInstance3,
+    state.chartInstance4,
+    state.chartInstance5,
+    state.chartInstance6,
+    state.chartInstance7,
+    state.chartInstance8,
+  ].filter(Boolean);
+}
+
+function syncChartToggleButton(button, isExpanded) {
+  if (!button) return;
+  const icon = button.querySelector('i');
+  button.setAttribute('aria-expanded', String(isExpanded));
+  button.setAttribute('aria-label', isExpanded ? 'Collapse chart' : 'Expand chart');
+  button.title = isExpanded ? 'Collapse chart' : 'Expand chart';
+  if (icon) {
+    icon.className = isExpanded ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+  }
+}
+
+function onChartsWrapClick(event) {
+  const toggleBtn = event.target.closest('[data-chart-toggle="true"]');
+  if (!toggleBtn) {
+    return;
+  }
+  const chartWrap = toggleBtn.closest('.chart-canvas-wrap');
+  const chartInner = chartWrap?.querySelector('.chart-canvas-inner');
+  if (!chartWrap || !chartInner) {
+    return;
+  }
+
+  const isExpanded = !chartInner.classList.contains('hidden');
+  const panelId = chartWrap.id || '';
+  chartInner.classList.toggle('hidden', isExpanded);
+  chartWrap.classList.toggle('chart-canvas-wrap-collapsed', isExpanded);
+  syncChartToggleButton(toggleBtn, !isExpanded);
+  setChartPanelCollapsed(panelId, isExpanded);
+
+  if (!isExpanded) {
+    const canvas = chartInner.querySelector('canvas');
+    if (!canvas) return;
+    const chart = getRenderedCharts().find((item) => item.canvas === canvas);
+    if (chart) {
+      chart.resize();
+      chart.update('none');
+    }
+  }
+}
+
+function renderChartVisibilityControls() {
+  if (!el.chartsVisibilityToggles) return;
+  el.chartsVisibilityToggles.innerHTML = CHART_PANEL_IDS
+    .map((panelId) => {
+      const label = CHART_PANEL_LABELS[panelId] || panelId;
+      const checked = isChartPanelVisible(panelId);
+      return `<label class="chart-visibility-chip${checked ? '' : ' is-inactive'}" data-chart-visibility-chip="${panelId}">
+        <input class="form-check-input" type="checkbox" data-chart-visibility-toggle="${panelId}"${checked ? ' checked' : ''} />
+        <span>${escapeHtml(label)}</span>
+      </label>`;
+    })
+    .join('');
+}
+
+function updateChartVisibilityControls() {
+  if (!el.chartsVisibilityToggles) return;
+  const chips = el.chartsVisibilityToggles.querySelectorAll('[data-chart-visibility-chip]');
+  for (const chip of chips) {
+    const panelId = chip.getAttribute('data-chart-visibility-chip') || '';
+    const checked = isChartPanelVisible(panelId);
+    const checkbox = chip.querySelector('[data-chart-visibility-toggle]');
+    if (checkbox) {
+      checkbox.checked = checked;
+    }
+    chip.classList.toggle('is-inactive', !checked);
+  }
+}
+
+function onChartVisibilityToggleChange(event) {
+  const checkbox = event.target.closest('[data-chart-visibility-toggle]');
+  if (!checkbox) return;
+  const panelId = checkbox.getAttribute('data-chart-visibility-toggle') || '';
+  setChartPanelVisible(panelId, Boolean(checkbox.checked));
+  applyChartPanelsVisibilityState();
+}
+
+function clearChartDropTargets() {
+  const wraps = CHART_PANEL_IDS.map((panelId) => document.getElementById(panelId)).filter(Boolean);
+  for (const wrap of wraps) {
+    wrap.classList.remove('chart-drop-target');
+  }
+}
+
+function persistChartPanelsOrderFromDom() {
+  if (!el.chartsWrap) return;
+  const order = Array.from(el.chartsWrap.querySelectorAll('.chart-canvas-wrap'))
+    .map((node) => node.id)
+    .filter((id) => CHART_PANEL_IDS.includes(id));
+  state.uiPrefs.chartPanelOrder = normalizeChartPanelOrder(order);
+  persistUiPrefs();
+}
+
+function onChartsWrapDragStart(event) {
+  const panel = event.target.closest('.chart-canvas-wrap');
+  if (!panel || panel.classList.contains('hidden')) {
+    return;
+  }
+  state.chartDraggedPanelId = panel.id;
+  panel.classList.add('chart-dragging');
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', panel.id);
+  }
+}
+
+function onChartsWrapDragOver(event) {
+  const draggedId = state.chartDraggedPanelId;
+  if (!draggedId) return;
+  const target = event.target.closest('.chart-canvas-wrap');
+  if (!target || target.id === draggedId || target.classList.contains('hidden')) {
+    return;
+  }
+  event.preventDefault();
+  clearChartDropTargets();
+  target.classList.add('chart-drop-target');
+  const dragged = document.getElementById(draggedId);
+  if (!dragged || dragged.parentElement !== el.chartsWrap) {
+    return;
+  }
+  const rect = target.getBoundingClientRect();
+  const insertAfter = event.clientY > rect.top + rect.height / 2;
+  if (insertAfter) {
+    if (target.nextElementSibling !== dragged) {
+      el.chartsWrap.insertBefore(dragged, target.nextElementSibling);
+    }
+  } else if (target !== dragged.nextElementSibling) {
+    el.chartsWrap.insertBefore(dragged, target);
+  }
+}
+
+function onChartsWrapDrop(event) {
+  if (!state.chartDraggedPanelId) return;
+  event.preventDefault();
+  clearChartDropTargets();
+  persistChartPanelsOrderFromDom();
+}
+
+function onChartsWrapDragEnd() {
+  const draggedId = state.chartDraggedPanelId;
+  if (draggedId) {
+    const dragged = document.getElementById(draggedId);
+    if (dragged) {
+      dragged.classList.remove('chart-dragging');
+    }
+    persistChartPanelsOrderFromDom();
+  }
+  clearChartDropTargets();
+  state.chartDraggedPanelId = null;
 }
 
 function chartShortDate(iso) {
@@ -2180,9 +2960,13 @@ function makeChartClickHandlers(sorted) {
 function buildTokensVsResponseTimeCharts(sorted) {
   const labels = sorted.map((_, i) => `#${i + 1}`);
   el.chartLabel.textContent  = 'Tokens';
-  el.chartLabel2.textContent = 'Response Time';
-  el.chartLabel3.textContent = 'Cost';
-  el.chartLabel4.textContent = 'Characters';
+  el.chartLabel2.textContent = 'Attachments Size';
+  el.chartLabel3.textContent = 'Files';
+  el.chartLabel4.textContent = 'Cost';
+  el.chartLabel5.textContent = 'Characters';
+  el.chartLabel6.textContent = 'Response Time';
+  el.chartLabel7.textContent = 'Cumulative Token Usage';
+  el.chartLabel8.textContent = 'Cumulative Cost';
 
   const tokensChart = new Chart(el.mainChart, {
     type: 'line',
@@ -2240,15 +3024,15 @@ function buildTokensVsResponseTimeCharts(sorted) {
     },
   });
 
-  const timeChart = new Chart(el.mainChart2, {
+  const attachmentsChart = new Chart(el.mainChart2, {
     type: 'line',
     plugins: [CROSSHAIR_PLUGIN],
     data: {
       labels,
       datasets: [{
-        label: 'Response time',
-        data: sorted.map((item) => item.responseTimeMs ?? 0),
-        borderColor: '#ea580c',
+        label: 'Total attachments size',
+        data: sorted.map((item) => getEntryAttachmentsTotalBytes(item)),
+        borderColor: '#0f766e',
         backgroundColor: 'transparent',
         tension: 0.3,
         borderWidth: 2,
@@ -2264,17 +3048,48 @@ function buildTokensVsResponseTimeCharts(sorted) {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (ctx) => `${ctx.raw} ms` } },
+        tooltip: { callbacks: { label: (ctx) => formatBytes(ctx.raw) } },
       },
       scales: {
         x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxTicksLimit: 20 } },
-        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, callback: (v) => `${v} ms` }, afterFit: (s) => { s.width = 88; } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, callback: (v) => formatBytes(v) }, afterFit: (s) => { s.width = 88; } },
       },
     },
   });
 
-  syncChartHover(tokensChart, timeChart);
-  const costChart = new Chart(el.mainChart3, {
+  const filesChart = new Chart(el.mainChart3, {
+    type: 'line',
+    plugins: [CROSSHAIR_PLUGIN],
+    data: {
+      labels,
+      datasets: [{
+        label: 'Attached files count',
+        data: sorted.map((item) => getEntryAttachments(item).length),
+        borderColor: '#475569',
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        borderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: false,
+      }],
+    },
+    options: {
+      ...makeChartClickHandlers(sorted),
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxTicksLimit: 20 } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, precision: 0 }, afterFit: (s) => { s.width = 88; } },
+      },
+    },
+  });
+
+  const costChart = new Chart(el.mainChart4, {
     type: 'line',
     plugins: [CROSSHAIR_PLUGIN],
     data: {
@@ -2331,7 +3146,7 @@ function buildTokensVsResponseTimeCharts(sorted) {
     },
   });
 
-  const charsChart = new Chart(el.mainChart4, {
+  const charsChart = new Chart(el.mainChart5, {
     type: 'line',
     plugins: [CROSSHAIR_PLUGIN],
     data: {
@@ -2409,23 +3224,44 @@ function buildTokensVsResponseTimeCharts(sorted) {
     },
   });
 
-  syncChartHover(tokensChart, [timeChart, costChart, charsChart]);
-  syncChartHover(timeChart,   [tokensChart, costChart, charsChart]);
-  syncChartHover(costChart,   [tokensChart, timeChart, charsChart]);
-  syncChartHover(charsChart,  [tokensChart, timeChart, costChart]);
+  const timeChart = new Chart(el.mainChart6, {
+    type: 'line',
+    plugins: [CROSSHAIR_PLUGIN],
+    data: {
+      labels,
+      datasets: [{
+        label: 'Response time',
+        data: sorted.map((item) => item.responseTimeMs ?? 0),
+        borderColor: '#ea580c',
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        borderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: false,
+      }],
+    },
+    options: {
+      ...makeChartClickHandlers(sorted),
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => `${ctx.raw} ms` } },
+      },
+      scales: {
+        x: { grid: CHART_GRID, ticks: { font: CHART_FONT, maxTicksLimit: 20 } },
+        y: { grid: CHART_GRID, beginAtZero: true, ticks: { font: CHART_FONT, callback: (v) => `${v} ms` }, afterFit: (s) => { s.width = 88; } },
+      },
+    },
+  });
 
-  return [tokensChart, timeChart, costChart, charsChart];
-}
-
-function buildCumulativeUsageCharts(sorted) {
-  el.chartLabel.textContent = 'Cumulative Token Usage';
   let cumInput = 0, cumOutput = 0, cumTotal = 0;
   const tokenInputData  = sorted.map((item) => { cumInput  += item.usage?.input_tokens  ?? 0; return cumInput; });
   const tokenOutputData = sorted.map((item) => { cumOutput += item.usage?.output_tokens ?? 0; return cumOutput; });
   const tokenTotalData  = sorted.map((item) => { cumTotal  += item.usage?.total_tokens  ?? 0; return cumTotal; });
-  const labels = sorted.map((_, i) => `#${i + 1}`);
-
-  const tokensChart = new Chart(el.mainChart, {
+  const cumulativeTokensChart = new Chart(el.mainChart7, {
     type: 'line',
     plugins: [CROSSHAIR_PLUGIN],
     data: {
@@ -2449,13 +3285,12 @@ function buildCumulativeUsageCharts(sorted) {
     },
   });
 
-  el.chartLabel2.textContent = 'Cumulative Cost';
   let cumCostInput = 0, cumCostOutput = 0, cumCostTotal = 0;
   const costInputData  = sorted.map((item) => { cumCostInput  += item.cost?.input_cost_usd  ?? 0; return parseFloat(cumCostInput.toFixed(8)); });
   const costOutputData = sorted.map((item) => { cumCostOutput += item.cost?.output_cost_usd ?? 0; return parseFloat(cumCostOutput.toFixed(8)); });
   const costTotalData  = sorted.map((item) => { cumCostTotal  += item.cost?.total_cost_usd  ?? 0; return parseFloat(cumCostTotal.toFixed(8)); });
 
-  const costChart = new Chart(el.mainChart2, {
+  const cumulativeCostChart = new Chart(el.mainChart8, {
     type: 'line',
     plugins: [CROSSHAIR_PLUGIN],
     data: {
@@ -2482,8 +3317,14 @@ function buildCumulativeUsageCharts(sorted) {
     },
   });
 
-  syncChartHover(tokensChart, costChart);
-  syncChartHover(costChart, tokensChart);
+  syncChartHover(tokensChart,           [attachmentsChart, filesChart, costChart, charsChart, timeChart, cumulativeTokensChart, cumulativeCostChart]);
+  syncChartHover(attachmentsChart,      [tokensChart, filesChart, costChart, charsChart, timeChart, cumulativeTokensChart, cumulativeCostChart]);
+  syncChartHover(filesChart,            [tokensChart, attachmentsChart, costChart, charsChart, timeChart, cumulativeTokensChart, cumulativeCostChart]);
+  syncChartHover(costChart,             [tokensChart, attachmentsChart, filesChart, charsChart, timeChart, cumulativeTokensChart, cumulativeCostChart]);
+  syncChartHover(charsChart,            [tokensChart, attachmentsChart, filesChart, costChart, timeChart, cumulativeTokensChart, cumulativeCostChart]);
+  syncChartHover(timeChart,             [tokensChart, attachmentsChart, filesChart, costChart, charsChart, cumulativeTokensChart, cumulativeCostChart]);
+  syncChartHover(cumulativeTokensChart, [tokensChart, attachmentsChart, filesChart, costChart, charsChart, timeChart, cumulativeCostChart]);
+  syncChartHover(cumulativeCostChart,   [tokensChart, attachmentsChart, filesChart, costChart, charsChart, timeChart, cumulativeTokensChart]);
 
-  return [tokensChart, costChart];
+  return [tokensChart, attachmentsChart, filesChart, costChart, charsChart, timeChart, cumulativeTokensChart, cumulativeCostChart];
 }
