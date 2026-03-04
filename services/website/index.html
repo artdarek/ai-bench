@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AI Bench</title>
+    <script>document.documentElement.setAttribute('data-bs-theme', localStorage.getItem('aibench_theme') || 'dark');</script>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -39,6 +40,10 @@
             <button id="headerSettingsBtn" class="btn-icon" aria-label="API key settings" title="Configure API keys" type="button">
               <i class="bi bi-gear" aria-hidden="true"></i>
               <span class="key-indicator" id="headerKeyIndicator" aria-hidden="true"></span>
+            </button>
+            <div class="vr"></div>
+            <button id="headerThemeBtn" class="btn-icon" aria-label="Toggle theme" title="Toggle light/dark mode" type="button">
+              <i class="bi bi-sun" aria-hidden="true" id="headerThemeIcon"></i>
             </button>
           </div>
         </div>
@@ -96,55 +101,54 @@
                 </div>
               </section>
 
+              <section class="control-group mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <label class="form-label fw-semibold mb-0" for="message"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
+                  <span id="messageCharPill" class="badge system-prompt-char-pill" aria-live="polite">0 chars</span>
+                </div>
+                <div class="input-group message-input-group">
+                  <textarea id="message" class="form-control" rows="1" placeholder="User message"></textarea>
+                  <button id="sendBtn" class="btn btn-primary send-btn-inline" type="button">
+                    <i class="bi bi-send-fill me-2" aria-hidden="true"></i>Send
+                  </button>
+                </div>
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" id="keepMessageAfterSend" checked />
+                  <label class="form-check-label text-body-secondary" for="keepMessageAfterSend">
+                    Keep message for next request
+                  </label>
+                </div>
+              </section>
+
               <section class="control-group">
-                <div class="mb-3">
-                  <div class="d-flex align-items-center justify-content-between mb-1">
-                    <label class="form-label fw-semibold mb-0" for="message"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
-                    <span id="messageCharPill" class="badge system-prompt-char-pill" aria-live="polite">0 chars</span>
+                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                  <label class="form-label fw-semibold mb-0" for="attachmentsInput">
+                    <i class="bi bi-paperclip label-icon" aria-hidden="true"></i>Attachments
+                  </label>
+                  <span id="attachmentsActiveCountPill" class="badge system-prompt-char-pill" aria-live="polite" title="Active attachments">0</span>
+                </div>
+                <input
+                  id="attachmentsInput"
+                  class="form-control form-control-sm"
+                  type="file"
+                  multiple
+                  accept=".c,.cpp,.cs,.css,.csv,.gif,.go,.html,.java,.jpeg,.jpg,.js,.json,.md,.pdf,.php,.png,.py,.rb,.sh,.tex,.ts,.txt,.webp,.xml"
+                />
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" id="keepAttachmentsAfterSend" />
+                  <label class="form-check-label text-body-secondary" for="keepAttachmentsAfterSend">
+                    Keep attachments for next request
+                  </label>
+                </div>
+                <div id="attachmentsList" class="attachments-list mt-3"></div>
+                <div id="attachmentsActionsRow" class="attachments-actions-row mt-2 hidden">
+                  <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="attachmentsSelectAll" />
+                    <label class="form-check-label text-body-secondary" for="attachmentsSelectAll">Select all</label>
                   </div>
-                  <div class="input-group message-input-group">
-                    <textarea id="message" class="form-control" rows="1" placeholder="User message"></textarea>
-                    <button id="sendBtn" class="btn btn-primary send-btn-inline" type="button">
-                      <i class="bi bi-send-fill me-2" aria-hidden="true"></i>Send
-                    </button>
-                  </div>
-                  <div class="form-check form-switch mt-2">
-                    <input class="form-check-input" type="checkbox" id="keepMessageAfterSend" checked />
-                    <label class="form-check-label text-body-secondary" for="keepMessageAfterSend">
-                      Keep message for next request
-                    </label>
-                  </div>
-                  <div class="attachments-wrap mt-2">
-                    <div class="d-flex align-items-center justify-content-between gap-2">
-                      <label class="form-label fw-semibold mb-0" for="attachmentsInput">
-                        <i class="bi bi-paperclip label-icon" aria-hidden="true"></i>Attachments
-                      </label>
-                      <span id="attachmentsActiveCountPill" class="badge system-prompt-char-pill" aria-live="polite" title="Active attachments">0</span>
-                    </div>
-                    <input
-                      id="attachmentsInput"
-                      class="form-control form-control-sm mt-1"
-                      type="file"
-                      multiple
-                      accept=".c,.cpp,.cs,.css,.csv,.gif,.go,.html,.java,.jpeg,.jpg,.js,.json,.md,.pdf,.php,.png,.py,.rb,.sh,.tex,.ts,.txt,.webp,.xml"
-                    />
-                    <div class="form-check form-switch mt-2">
-                      <input class="form-check-input" type="checkbox" id="keepAttachmentsAfterSend" />
-                      <label class="form-check-label text-body-secondary" for="keepAttachmentsAfterSend">
-                        Keep attachments for next request
-                      </label>
-                    </div>
-                    <div id="attachmentsList" class="attachments-list mt-3"></div>
-                    <div id="attachmentsActionsRow" class="attachments-actions-row mt-2 hidden">
-                      <div class="form-check mb-0">
-                        <input class="form-check-input" type="checkbox" id="attachmentsSelectAll" />
-                        <label class="form-check-label text-body-secondary" for="attachmentsSelectAll">Select all</label>
-                      </div>
-                      <button id="clearAttachmentsBtn" class="attachments-clear-btn hidden" type="button">
-                        Clear All <i class="bi bi-trash3 ms-1 attachments-clear-btn-icon" aria-hidden="true"></i>
-                      </button>
-                    </div>
-                  </div>
+                  <button id="clearAttachmentsBtn" class="attachments-clear-btn hidden" type="button">
+                    Clear All <i class="bi bi-trash3 ms-1 attachments-clear-btn-icon" aria-hidden="true"></i>
+                  </button>
                 </div>
               </section>
 

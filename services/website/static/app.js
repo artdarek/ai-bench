@@ -1,3 +1,4 @@
+const THEME_KEY = 'aibench_theme';
 const STORAGE_KEY = 'aibench_history_v1';
 const UI_PREFS_KEY = 'aibench_ui_prefs_v1';
 const SNAPSHOTS_LIST_KEY = 'aibench_snapshots_list_v1';
@@ -96,6 +97,8 @@ const el = {
   headerExportBtn: document.getElementById('headerExportBtn'),
   headerClearBtn: document.getElementById('headerClearBtn'),
   headerSettingsBtn: document.getElementById('headerSettingsBtn'),
+  headerThemeBtn: document.getElementById('headerThemeBtn'),
+  headerThemeIcon: document.getElementById('headerThemeIcon'),
   headerKeyIndicator: document.getElementById('headerKeyIndicator'),
   exportBtn: document.getElementById('exportBtn'),
   clearBtn: document.getElementById('clearBtn'),
@@ -300,6 +303,8 @@ async function saveSnapshot() {
 }
 
 async function init() {
+  applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+
   const response = await fetch('/api/config');
   const payload = await readApiResponse(response);
   if (!response.ok) {
@@ -463,6 +468,7 @@ async function init() {
   el.headerExportBtn.addEventListener('click', exportCsv);
   el.headerClearBtn.addEventListener('click', openClearConfirmModal);
   el.headerSettingsBtn.addEventListener('click', openSettingsModal);
+  el.headerThemeBtn.addEventListener('click', toggleTheme);
   el.exportBtn.addEventListener('click', exportCsv);
   el.clearBtn.addEventListener('click', openClearConfirmModal);
   el.settingsModal.addEventListener('click', onSettingsModalClick);
@@ -1911,6 +1917,20 @@ function setResponseLoading(isLoading) {
 function setResponseHasData(hasData) {
   state.hasResponseData = Boolean(hasData);
   el.responseContent.classList.toggle('response-empty', !state.hasResponseData);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-bs-theme', theme);
+  if (el.headerThemeIcon) {
+    el.headerThemeIcon.className = theme === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
 }
 
 function setStatus(text, type = 'info') {
