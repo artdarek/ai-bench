@@ -17,7 +17,7 @@ const DEFAULT_SYSTEM_PROMPT =
   'You are a friendly and polite assistant. Be warm, helpful, and concise in your responses.';
 const DEFAULT_MESSAGE = 'How are you?';
 const DEFAULT_HISTORY_MESSAGE_LIMIT = 10;
-const MAX_ATTACHMENT_COUNT = 8;
+const MAX_ATTACHMENT_COUNT = 20;
 const MAX_ATTACHMENT_SIZE_BYTES = 8 * 1024 * 1024;
 const MAX_TOTAL_ATTACHMENTS_SIZE_BYTES = 20 * 1024 * 1024;
 const SUPPORTED_DOCUMENT_EXTENSIONS = new Set([
@@ -1835,7 +1835,11 @@ async function onAttachmentsSelected(event) {
   const selectedFiles = uniqueFiles.slice(0, availableSlots);
 
   if (!selectedFiles.length) {
-    setStatus(`Attachment limit reached (${MAX_ATTACHMENT_COUNT}).`, 'warning');
+    if (!uniqueFiles.length) {
+      setStatus('These files are already added.', 'warning');
+    } else {
+      setStatus(`Attachment limit reached (${MAX_ATTACHMENT_COUNT}).`, 'warning');
+    }
     el.attachmentsInput.value = '';
     return;
   }
