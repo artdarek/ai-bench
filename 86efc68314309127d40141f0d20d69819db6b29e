@@ -1,0 +1,27 @@
+config/nginx.conf
+  4687e5b34285551e 5-6
+Dockerfile
+  4687e5b34285551e 4
+config/.htpasswd
+  4687e5b34285551e 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "86efc68314309127d40141f0d20d69819db6b29e",
+  "prompts": {
+    "4687e5b34285551e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019cb96b-2f01-7930-a121-a761223e7400",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "Dariusz Przada <dariusz.przada@miquido.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
