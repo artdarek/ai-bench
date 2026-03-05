@@ -523,6 +523,42 @@
   margin-bottom: 0;
 }
 
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.status-text {
+  min-width: 0;
+}
+
+.status-close-btn {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 0.3rem;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.status-close-btn:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.status-close-btn i {
+  font-size: 0.72rem;
+}
+
 .response-loader {
   min-height: 320px;
   display: flex;
@@ -540,6 +576,96 @@
   max-height: 340px;
   overflow: auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.history-summary-bar {
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+
+.history-summary-empty {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+/* ── Sumbar tiles ─────────────────────────────── */
+.sumbar-tiles {
+  display: flex;
+  align-items: stretch;
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sumbar-tiles::-webkit-scrollbar { display: none; }
+
+.sumbar-tile {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bs-tertiary-bg);
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.65rem;
+  flex-shrink: 0;
+}
+
+.sumbar-tile-icon {
+  font-size: 0.85rem;
+  color: var(--primary);
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.sumbar-tile-val {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.sumbar-tile-lbl {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1.15;
+}
+
+/* ── Sumbar wide breakdown tile ───────────────── */
+.sumbar-tile--wide {
+  padding: 0.3rem 0.7rem;
+}
+
+.sumbar-bd-grid {
+  display: grid;
+  grid-template-columns: auto repeat(4, auto);
+  column-gap: 0.7rem;
+  row-gap: 0.08rem;
+  align-items: baseline;
+}
+
+.sumbar-bd-col-lbl {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sumbar-bd-row-lbl {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding-right: 0.15rem;
+}
+
+.sumbar-bd-val {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .response-box {
@@ -854,6 +980,10 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.4rem;
+}
+
+.files-reuse-icon-btn {
+  margin-right: 0.1rem;
 }
 
 .response-file-chip {

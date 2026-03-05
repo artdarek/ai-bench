@@ -305,7 +305,9 @@ def run_chat(payload: ChatRequest) -> dict[str, Any]:
 
             models = provider_cfg.get('models', [])
             model_cfg = next((m for m in models if m.get('id') == payload.model), None)
-            if model_cfg and not model_cfg.get('enabled', True):
+            if not model_cfg:
+                raise HTTPException(status_code=400, detail='Unknown OpenAI model.')
+            if not model_cfg.get('enabled', True):
                 raise HTTPException(status_code=400, detail='Model is disabled.')
 
             api_key = (payload.api_key or '').strip() or os.getenv('OPENAI_API_KEY', '').strip()

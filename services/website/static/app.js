@@ -42,6 +42,7 @@ const CHART_PANEL_LABELS = {
   chartsWrap8: 'Cumulative Cost',
 };
 let attachmentsDbPromise = null;
+let statusHideTimer = null;
 
 const state = {
   config: null,
@@ -103,6 +104,9 @@ const el = {
   exportBtn: document.getElementById('exportBtn'),
   clearBtn: document.getElementById('clearBtn'),
   status: document.getElementById('status'),
+  historySummaryBar: document.getElementById('historySummaryBar'),
+  historySummaryRowPrimary: document.getElementById('historySummaryRowPrimary'),
+  historySummaryRowSecondary: document.getElementById('historySummaryRowSecondary'),
   responseCard: document.getElementById('responseCard'),
   responseLoader: document.getElementById('responseLoader'),
   responseContent: document.getElementById('responseContent'),
@@ -362,6 +366,8 @@ async function init() {
   el.keepMessageAfterSend.addEventListener('change', onKeepMessageAfterSendChange);
   el.history.addEventListener('click', onHistoryClick);
   el.historyDetailsModal.addEventListener('click', onModalClick);
+  el.responseFilesChips.addEventListener('click', onFilesReuseClick);
+  el.historyDetailsFilesChips.addEventListener('click', onFilesReuseClick);
   el.historyDetailsCloseBtn.addEventListener('click', closeHistoryDetailsModal);
   el.historyConfirmModal.addEventListener('click', onConfirmModalClick);
   el.historyConfirmCloseBtn.addEventListener('click', closeConfirmModal);
@@ -481,6 +487,7 @@ async function init() {
   el.settingsRemoveKeyBtn.addEventListener('click', removeSettingsProviderKey);
   el.settingsToggleApiKeyBtn.addEventListener('click', toggleSettingsApiKeyVisibility);
   el.settingsApiKey.addEventListener('keydown', onSettingsApiKeyKeyDown);
+  el.status.addEventListener('click', onStatusClick);
   document.querySelectorAll('.textarea-action-btn[data-copy]').forEach((btn) => {
     btn.addEventListener('click', onTextareaActionCopy);
   });
@@ -935,7 +942,7 @@ async function onSend() {
       el.message.value = '';
     }
     if (!el.keepAttachmentsAfterSend?.checked) {
-      clearAttachments();
+      deactivateAllAttachments();
     }
     resizeMessageInput();
     updateMessageCharPill();
@@ -949,6 +956,7 @@ async function onSend() {
 }
 
 function renderHistory() {
+  renderHistorySummaryBar();
   updateHistoryActionButtons();
   const count = state.history.length;
   el.historyTabBtn.innerHTML = `<i class="bi bi-clock-history me-1" aria-hidden="true"></i>History${count > 0 ? ` (${count})` : ''}`;
@@ -964,17 +972,7 @@ function renderHistory() {
       (item) => {
         const isChecked = state.compareSelection.has(item.id);
         const files = Array.isArray(item.attachments) ? item.attachments : [];
-        const filesMarkup = files.length
-          ? files
-              .map(
-                (file) => `<span class="badge response-time-badge response-file-chip">
-                  <i class="bi bi-paperclip" aria-hidden="true"></i>
-                  <span class="response-file-name" title="${escapeHtml(file.name || 'file')}">${escapeHtml(file.name || 'file')}</span>
-                  <span class="response-file-size">${formatBytes(file.size || 0)}</span>
-                </span>`
-              )
-              .join('')
-          : '<span class="badge response-time-badge">No files attached.</span>';
+        const filesMarkup = buildFilesChips(files);
         return `<div class="history-item-wrap">
         <input class="form-check-input history-compare-cb history-compare-cb-outer" type="checkbox" data-entry-id="${item.id}"${isChecked ? ' checked' : ''} title="Select for comparison" aria-label="Select run for comparison">
         <article class="history-item${isChecked ? ' history-item-selected' : ''}">
@@ -1005,7 +1003,7 @@ function renderHistory() {
               <label class="form-label fw-semibold mb-0"><i class="bi bi-chat-text label-icon" aria-hidden="true"></i>Message</label>
               <div class="textarea-action-btns">
                 <button class="textarea-action-btn" title="Copy to clipboard" data-action="copy"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
-                <button class="textarea-action-btn" title="Reuse as message" data-action="reuse" data-target="message"><i class="bi bi-arrow-return-left" aria-hidden="true"></i></button>
+                <button class="textarea-action-btn" title="Reuse as message" data-action="reuse" data-target="message"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
               </div>
             </div>
             <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.message || '')}</textarea>
@@ -1024,7 +1022,7 @@ function renderHistory() {
               <label class="form-label fw-semibold mb-0"><i class="bi bi-sliders2 label-icon" aria-hidden="true"></i>System Prompt</label>
               <div class="textarea-action-btns">
                 <button class="textarea-action-btn" title="Copy to clipboard" data-action="copy"><i class="bi bi-clipboard" aria-hidden="true"></i></button>
-                <button class="textarea-action-btn" title="Reuse as system prompt" data-action="reuse" data-target="systemPrompt"><i class="bi bi-arrow-return-left" aria-hidden="true"></i></button>
+                <button class="textarea-action-btn" title="Reuse as system prompt" data-action="reuse" data-target="systemPrompt"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
               </div>
             </div>
             <textarea class="form-control history-preview-textarea" rows="4" readonly>${escapeHtml(item.systemPrompt || '')}</textarea>
@@ -1104,6 +1102,124 @@ function renderHistory() {
       }
     )
     .join('');
+}
+
+function computeHistorySummary(items) {
+  const history = Array.isArray(items) ? items : [];
+  const summary = {
+    requestsCount: history.length,
+    providerCounts: { openai: 0, azure: 0, unknown: 0 },
+    totalCostUsd: 0,
+    inputCostUsd: 0,
+    outputCostUsd: 0,
+    inputCachedCostUsd: 0,
+    inputNonCachedCostUsd: 0,
+    totalTokens: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    inputCachedTokens: 0,
+    inputNonCachedTokens: 0,
+    responseTimeTotalMs: 0,
+    responseTimeCount: 0,
+    filesCountTotal: 0,
+    filesBytesTotal: 0,
+  };
+
+  for (const entry of history) {
+    const provider = String(entry?.provider || '').toLowerCase();
+    if (provider === 'openai' || provider === 'azure') {
+      summary.providerCounts[provider] += 1;
+    } else {
+      summary.providerCounts.unknown += 1;
+    }
+
+    const usage = entry?.usage || {};
+    const cost = entry?.cost || {};
+    const inputTokens = Number(usage.input_tokens ?? 0);
+    const outputTokens = Number(usage.output_tokens ?? 0);
+    const totalTokens = Number(usage.total_tokens ?? inputTokens + outputTokens);
+    const cachedTokens = Number(usage.input_cached_tokens ?? 0);
+    const nonCachedTokens = Number(usage.input_non_cached_tokens ?? Math.max(0, inputTokens - cachedTokens));
+
+    summary.inputTokens += Number.isFinite(inputTokens) ? inputTokens : 0;
+    summary.outputTokens += Number.isFinite(outputTokens) ? outputTokens : 0;
+    summary.totalTokens += Number.isFinite(totalTokens) ? totalTokens : 0;
+    summary.inputCachedTokens += Number.isFinite(cachedTokens) ? cachedTokens : 0;
+    summary.inputNonCachedTokens += Number.isFinite(nonCachedTokens) ? nonCachedTokens : 0;
+
+    const inputCost = Number(cost.input_cost_usd ?? 0);
+    const outputCost = Number(cost.output_cost_usd ?? 0);
+    const totalCost = Number(cost.total_cost_usd ?? inputCost + outputCost);
+    const cachedCost = Number(cost.input_cached_cost_usd ?? 0);
+    const nonCachedCost = Number(cost.input_non_cached_cost_usd ?? Math.max(0, inputCost - cachedCost));
+
+    summary.inputCostUsd += Number.isFinite(inputCost) ? inputCost : 0;
+    summary.outputCostUsd += Number.isFinite(outputCost) ? outputCost : 0;
+    summary.totalCostUsd += Number.isFinite(totalCost) ? totalCost : 0;
+    summary.inputCachedCostUsd += Number.isFinite(cachedCost) ? cachedCost : 0;
+    summary.inputNonCachedCostUsd += Number.isFinite(nonCachedCost) ? nonCachedCost : 0;
+
+    const responseTime = Number(entry?.responseTimeMs ?? 0);
+    if (Number.isFinite(responseTime) && responseTime >= 0) {
+      summary.responseTimeTotalMs += responseTime;
+      summary.responseTimeCount += 1;
+    }
+
+    const files = getEntryAttachments(entry);
+    summary.filesCountTotal += files.length;
+    summary.filesBytesTotal += getEntryAttachmentsTotalBytes(entry);
+  }
+
+  summary.avgResponseTimeMs = summary.responseTimeCount > 0
+    ? summary.responseTimeTotalMs / summary.responseTimeCount
+    : 0;
+
+  return summary;
+}
+
+function renderHistorySummaryBar() {
+  if (!el.historySummaryRowPrimary || !el.historySummaryRowSecondary) {
+    return;
+  }
+  const summary = computeHistorySummary(state.history);
+
+  function tile(icon, val, lbl) {
+    return `<div class="sumbar-tile"><i class="bi ${icon} sumbar-tile-icon" aria-hidden="true"></i><div><div class="sumbar-tile-val">${val}</div><div class="sumbar-tile-lbl">${lbl}</div></div></div>`;
+  }
+
+  const breakdownTile = `<div class="sumbar-tile sumbar-tile--wide">
+    <div class="sumbar-bd-grid">
+      <span></span>
+      <span class="sumbar-bd-col-lbl">in</span>
+      <span class="sumbar-bd-col-lbl">in cached</span>
+      <span class="sumbar-bd-col-lbl">in non-cached</span>
+      <span class="sumbar-bd-col-lbl">out</span>
+      <span class="sumbar-bd-row-lbl"><i class="bi bi-coin" aria-hidden="true"></i> Cost</span>
+      <span class="sumbar-bd-val">$${formatUsd(summary.inputCostUsd)}</span>
+      <span class="sumbar-bd-val">$${formatUsd(summary.inputCachedCostUsd)}</span>
+      <span class="sumbar-bd-val">$${formatUsd(summary.inputNonCachedCostUsd)}</span>
+      <span class="sumbar-bd-val">$${formatUsd(summary.outputCostUsd)}</span>
+      <span class="sumbar-bd-row-lbl"><i class="bi bi-braces" aria-hidden="true"></i> Tokens</span>
+      <span class="sumbar-bd-val">${Math.round(summary.inputTokens).toLocaleString()}</span>
+      <span class="sumbar-bd-val">${Math.round(summary.inputCachedTokens).toLocaleString()}</span>
+      <span class="sumbar-bd-val">${Math.round(summary.inputNonCachedTokens).toLocaleString()}</span>
+      <span class="sumbar-bd-val">${Math.round(summary.outputTokens).toLocaleString()}</span>
+    </div>
+  </div>`;
+
+  const tiles = [
+    tile('bi-send-check', summary.requestsCount, 'requests'),
+    tile('bi-clock', formatResponseTimeMs(summary.avgResponseTimeMs), 'avg time'),
+  ];
+  if (summary.filesCountTotal > 0) {
+    tiles.push(tile('bi-paperclip', `${summary.filesCountTotal}&thinsp;/&thinsp;${escapeHtml(formatChatFilesSize(summary.filesBytesTotal))}`, 'files'));
+  }
+  tiles.push(tile('bi-braces', Math.round(summary.totalTokens).toLocaleString(), 'total tokens'));
+  tiles.push(breakdownTile);
+  tiles.push(tile('bi-currency-dollar', `$${formatUsd(summary.totalCostUsd)}`, 'total cost'));
+
+  el.historySummaryRowPrimary.innerHTML = `<div class="sumbar-tiles">${tiles.join('')}</div>`;
+  el.historySummaryRowSecondary.classList.add('hidden');
 }
 
 function updateHistoryActionButtons() {
@@ -1461,6 +1577,11 @@ function openClearConfirmModal() {
 }
 
 function onHistoryClick(event) {
+  if (event.target.closest('[data-files-reuse="true"]')) {
+    onFilesReuseClick(event);
+    return;
+  }
+
   const textareaActionBtn = event.target.closest('.textarea-action-btn');
   if (textareaActionBtn) {
     const field = textareaActionBtn.closest('.history-preview-field');
@@ -1541,6 +1662,7 @@ function onHistoryClick(event) {
     el.systemPrompt.value = entry.systemPrompt || '';
     updateSystemPromptCharPill();
     el.message.value = entry.message || '';
+    restoreAttachmentsSelectionFromHistory(entry);
     resizeMessageInput();
     updateMessageCharPill();
     setStatus('History entry loaded into form.', 'success');
@@ -1708,6 +1830,116 @@ function formatEntryAttachmentsList(entry) {
     .join('; ');
 }
 
+function normalizeFilesForReuse(files) {
+  const list = Array.isArray(files) ? files : [];
+  return list.map((file) => ({
+    name: String(file?.name || 'file'),
+    size: Number(file?.size || 0),
+  }));
+}
+
+function encodeFilesPayload(files) {
+  return encodeURIComponent(JSON.stringify(normalizeFilesForReuse(files)));
+}
+
+function decodeFilesPayload(payload) {
+  if (!payload) return [];
+  try {
+    return normalizeFilesForReuse(JSON.parse(decodeURIComponent(String(payload))));
+  } catch {
+    return [];
+  }
+}
+
+function restoreAttachmentsSelectionFromFiles(files, options = {}) {
+  const { showStatus = true } = options;
+  const requestedFiles = normalizeFilesForReuse(files);
+  const requestedCount = requestedFiles.length;
+
+  if (!state.attachments.length) {
+    if (showStatus) {
+      setStatus('No uploaded files available to restore.', 'warning');
+    }
+    return { matchedCount: 0, requestedCount };
+  }
+  const requestedCounts = new Map();
+  let matchedCount = 0;
+
+  for (const file of requestedFiles) {
+    const key = `${String(file?.name || '')}::${Number(file?.size || 0)}`;
+    requestedCounts.set(key, (requestedCounts.get(key) || 0) + 1);
+  }
+
+  state.attachments = state.attachments.map((item) => {
+    const key = `${String(item.name || '')}::${Number(item.size || 0)}`;
+    const left = requestedCounts.get(key) || 0;
+    if (left > 0) {
+      requestedCounts.set(key, left - 1);
+      matchedCount += 1;
+      return { ...item, enabled: true };
+    }
+    return { ...item, enabled: false };
+  });
+
+  renderAttachments();
+  void persistAttachmentsCache();
+  if (showStatus) {
+    setStatus(`Files restored: ${matchedCount} matched out of ${requestedCount}.`, matchedCount > 0 ? 'success' : 'info');
+  }
+  return { matchedCount, requestedCount };
+}
+
+function restoreAttachmentsSelectionFromHistory(entry) {
+  return restoreAttachmentsSelectionFromFiles(getEntryAttachments(entry), { showStatus: false });
+}
+
+function buildFilesSummaryChip(files) {
+  const list = Array.isArray(files) ? files : [];
+  const totalSize = list.reduce((sum, file) => sum + Number(file?.size || 0), 0);
+  return `<span class="badge response-time-badge response-file-chip">
+    <i class="bi bi-paperclip" aria-hidden="true"></i>
+    <span class="response-file-name">${list.length} / ${escapeHtml(formatChatFilesSize(totalSize))}</span>
+  </span>`;
+}
+
+function buildFilesReuseChip(files) {
+  const list = normalizeFilesForReuse(files);
+  if (!list.length) {
+    return '';
+  }
+  const payload = encodeFilesPayload(list);
+  return `<button class="textarea-action-btn files-reuse-icon-btn" type="button" title="Reuse files" aria-label="Reuse files" data-files-reuse="true" data-files-payload="${payload}">
+    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+  </button>`;
+}
+
+function buildFilesChips(files) {
+  const list = normalizeFilesForReuse(files);
+  if (!list.length) {
+    return '<span class="badge response-time-badge">No files attached.</span>';
+  }
+  const reuseChip = buildFilesReuseChip(list);
+  const summaryChip = buildFilesSummaryChip(list);
+  const fileChips = list
+    .map(
+      (file) => `<span class="badge response-time-badge response-file-chip">
+        <i class="bi bi-paperclip" aria-hidden="true"></i>
+        <span class="response-file-name" title="${escapeHtml(file.name || 'file')}">${escapeHtml(file.name || 'file')}</span>
+        <span class="response-file-size">${formatBytes(file.size || 0)}</span>
+      </span>`
+    )
+    .join('');
+  return `${reuseChip}${summaryChip}${fileChips}`;
+}
+
+function onFilesReuseClick(event) {
+  const btn = event.target.closest('[data-files-reuse="true"]');
+  if (!btn) return;
+  event.preventDefault();
+  const files = decodeFilesPayload(btn.dataset.filesPayload || '');
+  restoreAttachmentsSelectionFromFiles(files, { showStatus: true });
+}
+
 function getFileExtension(filename) {
   const raw = String(filename || '').trim().toLowerCase();
   const dot = raw.lastIndexOf('.');
@@ -1769,6 +2001,15 @@ function clearAttachments() {
   void persistAttachmentsCache();
 }
 
+function deactivateAllAttachments() {
+  if (!state.attachments.length) {
+    return;
+  }
+  state.attachments = state.attachments.map((item) => ({ ...item, enabled: false }));
+  renderAttachments();
+  void persistAttachmentsCache();
+}
+
 function onAttachmentListClick(event) {
   const button = event.target.closest('[data-attachment-id]');
   if (!button) return;
@@ -1800,37 +2041,11 @@ function onAttachmentsSelectAllChange(event) {
 }
 
 function renderResponseFiles(files) {
-  const list = Array.isArray(files) ? files : [];
-  if (!list.length) {
-    el.responseFilesChips.innerHTML = '<span class="badge response-time-badge">No files attached.</span>';
-    return;
-  }
-  el.responseFilesChips.innerHTML = list
-    .map(
-      (file) => `<span class="badge response-time-badge response-file-chip">
-        <i class="bi bi-paperclip" aria-hidden="true"></i>
-        <span class="response-file-name" title="${escapeHtml(file.name || 'file')}">${escapeHtml(file.name || 'file')}</span>
-        <span class="response-file-size">${formatBytes(file.size || 0)}</span>
-      </span>`
-    )
-    .join('');
+  el.responseFilesChips.innerHTML = buildFilesChips(files);
 }
 
 function renderHistoryDetailsFiles(files) {
-  const list = Array.isArray(files) ? files : [];
-  if (!list.length) {
-    el.historyDetailsFilesChips.innerHTML = '<span class="badge response-time-badge">No files attached.</span>';
-    return;
-  }
-  el.historyDetailsFilesChips.innerHTML = list
-    .map(
-      (file) => `<span class="badge response-time-badge response-file-chip">
-        <i class="bi bi-paperclip" aria-hidden="true"></i>
-        <span class="response-file-name" title="${escapeHtml(file.name || 'file')}">${escapeHtml(file.name || 'file')}</span>
-        <span class="response-file-size">${formatBytes(file.size || 0)}</span>
-      </span>`
-    )
-    .join('');
+  el.historyDetailsFilesChips.innerHTML = buildFilesChips(files);
 }
 
 async function onAttachmentsSelected(event) {
@@ -1942,9 +2157,12 @@ function toggleTheme() {
 
 function setStatus(text, type = 'info') {
   if (!text) {
-    el.status.textContent = '';
-    el.status.className = 'status';
+    clearStatus();
     return;
+  }
+  if (statusHideTimer) {
+    clearTimeout(statusHideTimer);
+    statusHideTimer = null;
   }
   const alertClass = {
     success: 'alert-success',
@@ -1952,8 +2170,31 @@ function setStatus(text, type = 'info') {
     warning: 'alert-warning',
     info: 'alert-info',
   }[type] || 'alert-info';
-  el.status.textContent = text;
-  el.status.className = `status alert ${alertClass} mb-3`;
+  el.status.innerHTML = `<div class="status-row">
+    <span class="status-text">${escapeHtml(text)}</span>
+    <button class="status-close-btn" type="button" aria-label="Close status" title="Close" data-status-close="true">
+      <i class="bi bi-x-lg" aria-hidden="true"></i>
+    </button>
+  </div>`;
+  el.status.className = `status alert ${alertClass} mb-3 mt-0`;
+  statusHideTimer = window.setTimeout(() => {
+    clearStatus();
+  }, 10000);
+}
+
+function clearStatus() {
+  if (statusHideTimer) {
+    clearTimeout(statusHideTimer);
+    statusHideTimer = null;
+  }
+  el.status.innerHTML = '';
+  el.status.className = 'status mb-3 mt-0';
+}
+
+function onStatusClick(event) {
+  if (event.target.closest('[data-status-close="true"]')) {
+    clearStatus();
+  }
 }
 
 function formatUsd(value) {
