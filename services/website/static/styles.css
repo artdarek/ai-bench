@@ -631,6 +631,48 @@
   line-height: 1.15;
 }
 
+/* ── Sumbar filter tile ───────────────────────── */
+.sumbar-tile--filter {
+  gap: 0.35rem;
+  cursor: default;
+}
+
+.sumbar-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.22rem;
+  max-width: 260px;
+}
+
+.sumbar-filter-chip {
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.3rem;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  background: var(--primary);
+  color: #fff;
+  border: 1px solid transparent;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+[data-bs-theme="light"] .sumbar-filter-chip {
+  color: #fff;
+}
+
+.sumbar-filter-chip.inactive {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border);
+  opacity: 0.55;
+}
+
+.sumbar-filter-chip:hover {
+  opacity: 0.8;
+}
+
 /* ── Sumbar wide breakdown tile ───────────────── */
 .sumbar-tile--wide {
   padding: 0.3rem 0.7rem;

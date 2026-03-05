@@ -65,6 +65,7 @@ const state = {
   chartDraggedPanelId: null,
   snapshotSaved: false,
   attachments: [],
+  summaryFilter: { providers: null, models: null },
 };
 
 const el = {
@@ -331,6 +332,7 @@ async function init() {
       const snapData = await snapResp.json();
       if (Array.isArray(snapData.history)) {
         state.history = snapData.history;
+        state.summaryFilter = { providers: null, models: null };
         state.snapshotSaved = false;
       }
     } else {
@@ -364,6 +366,7 @@ async function init() {
   el.historyMessageLimit.addEventListener('change', onHistoryMessageLimitChange);
   el.historyMessageLimit.addEventListener('input', onHistoryMessageLimitChange);
   el.keepMessageAfterSend.addEventListener('change', onKeepMessageAfterSendChange);
+  el.historySummaryBar.addEventListener('click', onSummaryFilterClick);
   el.history.addEventListener('click', onHistoryClick);
   el.historyDetailsModal.addEventListener('click', onModalClick);
   el.responseFilesChips.addEventListener('click', onFilesReuseClick);
@@ -1177,14 +1180,80 @@ function computeHistorySummary(items) {
   return summary;
 }
 
+function onSummaryFilterClick(e) {
+  const chip = e.target.closest('[data-sf-type]');
+  if (!chip) return;
+  const type = chip.dataset.sfType;   // 'provider' | 'model'
+  const val  = chip.dataset.sfVal;
+  const filterKey = type === 'provider' ? 'providers' : 'models';
+
+  // Collect all available values from history
+  const allVals = new Set(
+    state.history.map((entry) => type === 'provider'
+      ? (entry.provider || '')
+      : (entry.deployment || entry.model || ''))
+  );
+
+  // Initialise set from null (= all selected)
+  if (state.summaryFilter[filterKey] === null) {
+    state.summaryFilter[filterKey] = new Set(allVals);
+  }
+
+  const current = state.summaryFilter[filterKey];
+  if (current.has(val)) {
+    current.delete(val);
+    // If nothing left, restore all
+    if (current.size === 0) state.summaryFilter[filterKey] = new Set(allVals);
+  } else {
+    current.add(val);
+  }
+
+  // If all selected again, normalise back to null
+  if (state.summaryFilter[filterKey] && allVals.size === state.summaryFilter[filterKey].size) {
+    let allMatch = true;
+    for (const v of allVals) { if (!state.summaryFilter[filterKey].has(v)) { allMatch = false; break; } }
+    if (allMatch) state.summaryFilter[filterKey] = null;
+  }
+
+  renderHistorySummaryBar();
+}
+
 function renderHistorySummaryBar() {
   if (!el.historySummaryRowPrimary || !el.historySummaryRowSecondary) {
     return;
   }
-  const summary = computeHistorySummary(state.history);
+
+  // Collect unique providers & models across all history
+  const allProviders = [...new Set(state.history.map((e) => e.provider || ''))].filter(Boolean);
+  const allModels    = [...new Set(state.history.map((e) => e.deployment || e.model || ''))].filter(Boolean);
+
+  const activeProviders = state.summaryFilter.providers ?? new Set(allProviders);
+  const activeModels    = state.summaryFilter.models    ?? new Set(allModels);
+
+  const filtered = state.history.filter((e) => {
+    const p = e.provider || '';
+    const m = e.deployment || e.model || '';
+    return activeProviders.has(p) && (allModels.length === 0 || activeModels.has(m));
+  });
+
+  const summary = computeHistorySummary(filtered);
 
   function tile(icon, val, lbl) {
     return `<div class="sumbar-tile"><i class="bi ${icon} sumbar-tile-icon" aria-hidden="true"></i><div><div class="sumbar-tile-val">${val}</div><div class="sumbar-tile-lbl">${lbl}</div></div></div>`;
+  }
+
+  function filterTile(icon, lbl, allVals, activeSet, sfType) {
+    if (allVals.length === 0) {
+      return `<div class="sumbar-tile sumbar-tile--filter"><i class="bi ${icon} sumbar-tile-icon" aria-hidden="true"></i><div class="sumbar-filter-chips"><span class="sumbar-filter-chip inactive">${lbl}</span></div></div>`;
+    }
+    const chips = allVals.map((v) => {
+      const on = activeSet.has(v);
+      const label = sfType === 'provider'
+        ? (state.config?.providers?.[v]?.label || v)
+        : v;
+      return `<span class="sumbar-filter-chip${on ? '' : ' inactive'}" data-sf-type="${sfType}" data-sf-val="${escapeHtml(v)}" title="${escapeHtml(label)}">${escapeHtml(label)}</span>`;
+    }).join('');
+    return `<div class="sumbar-tile sumbar-tile--filter"><i class="bi ${icon} sumbar-tile-icon" aria-hidden="true"></i><div class="sumbar-filter-chips">${chips}</div></div>`;
   }
 
   const breakdownTile = `<div class="sumbar-tile sumbar-tile--wide">
@@ -1208,6 +1277,8 @@ function renderHistorySummaryBar() {
   </div>`;
 
   const tiles = [
+    filterTile('bi-hdd-network', 'providers', allProviders, activeProviders, 'provider'),
+    filterTile('bi-cpu',         'models',    allModels,    activeModels,    'model'),
     tile('bi-send-check', summary.requestsCount, 'requests'),
     tile('bi-clock', formatResponseTimeMs(summary.avgResponseTimeMs), 'avg time'),
   ];
@@ -1218,7 +1289,7 @@ function renderHistorySummaryBar() {
   tiles.push(breakdownTile);
   tiles.push(tile('bi-currency-dollar', `$${formatUsd(summary.totalCostUsd)}`, 'total cost'));
 
-  el.historySummaryRowPrimary.innerHTML = `<div class="sumbar-tiles">${tiles.join('')}</div>`;
+  el.historySummaryRowPrimary.innerHTML = `<div class="sumbar-tiles">${tiles.filter(Boolean).join('')}</div>`;
   el.historySummaryRowSecondary.classList.add('hidden');
 }
 
@@ -1536,6 +1607,7 @@ function persistHistory() {
 function clearHistory() {
   state.history = [];
   state.compareSelection.clear();
+  state.summaryFilter = { providers: null, models: null };
   persistHistory();
   state.snapshotSaved = false;
   updateSaveBtn();
@@ -3056,7 +3128,12 @@ function onChartsWrapClick(event) {
 
 function renderChartVisibilityControls() {
   if (!el.chartsVisibilityToggles) return;
-  el.chartsVisibilityToggles.innerHTML = CHART_PANEL_IDS
+  const orderedIds = el.chartsWrap
+    ? Array.from(el.chartsWrap.querySelectorAll('.chart-canvas-wrap'))
+        .map((n) => n.id)
+        .filter((id) => CHART_PANEL_IDS.includes(id))
+    : CHART_PANEL_IDS;
+  el.chartsVisibilityToggles.innerHTML = orderedIds
     .map((panelId) => {
       const label = CHART_PANEL_LABELS[panelId] || panelId;
       const checked = isChartPanelVisible(panelId);
@@ -3149,6 +3226,7 @@ function onChartsWrapDrop(event) {
   event.preventDefault();
   clearChartDropTargets();
   persistChartPanelsOrderFromDom();
+  renderChartVisibilityControls();
 }
 
 function onChartsWrapDragEnd() {
